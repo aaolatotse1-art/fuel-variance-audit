@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fuel Variance Audit — Login</title>
+  <link rel="icon" type="image/png" href="fva-logo.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0f1923;
+      --surface:  #1e2530;
+      --border:   #2d3748;
+      --text:     #e7ebf0;
+      --muted:    #8a9ab5;
+      --primary:  #3b82f6;
+      --primary-h:#2563eb;
+      --input-bg: #111827;
+      --danger:   #ef4444;
+      --success:  #22c55e;
+    }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+    }
+
+    /* ═══ TWO-PANEL WRAPPER ═══ */
+    .page { display: flex; width: 100%; min-height: 100vh; }
+
+    /* ──────────── LEFT PANEL ──────────── */
+    .left-panel {
+      flex: 0 0 44%;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    /* B&W video background */
+    .bg-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      filter: grayscale(100%) brightness(0.42);
+      z-index: 0;
+    }
+    /* Dark teal overlay */
+    .vid-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(140deg, rgba(0,107,123,0.68) 0%, rgba(15,25,35,0.80) 100%);
+      z-index: 1;
+    }
+    /* Brand content */
+    .brand {
+      position: relative; z-index: 2;
+      padding: 52px 48px 0;
+      color: #fff;
+    }
+    .brand-logo {
+      width: 68px; height: 68px; border-radius: 18px;
+      background: rgba(255,255,255,.13);
+      border: 1px solid rgba(255,255,255,.2);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; margin-bottom: 52px;
+    }
+    .brand-logo img { width: 100%; height: 100%; object-fit: contain; }
+    .brand-title {
+      font-size: 40px; font-weight: 800;
+      line-height: 1.1; margin-bottom: 16px;
+      text-shadow: 0 2px 12px rgba(0,0,0,.4);
+    }
+    .brand-sub {
+      font-size: 14px; color: rgba(255,255,255,.7);
+      max-width: 280px; line-height: 1.7;
+    }
+    /* Decorative dots grid */
+    .dots-grid {
+      position: relative; z-index: 2;
+      padding: 0 48px 52px;
+      display: grid;
+      grid-template-columns: repeat(5, 8px);
+      gap: 10px;
+    }
+    .dots-grid span {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.28);
+      display: block;
+    }
+
+    /* ──────────── RIGHT PANEL ──────────── */
+    .right-panel {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      padding: 40px 32px;
+      overflow-y: auto;
+      position: relative;
+    }
+    .card { width: 100%; max-width: 400px; position: relative; z-index: 1; }
+
+    /* Topography animated background */
+    .topo-bg {
+      position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0;
+      filter: blur(3px);
+    }
+
+    /* Logo icon */
+    .logo-row { text-align: center; margin-bottom: 16px; }
+    .logo-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .logo-icon img { width: 84px; height: 84px; object-fit: contain; }
+    .card-title { font-size: 22px; font-weight: 700; color: var(--text); text-align: center; margin-bottom: 6px; }
+    .card-sub   { font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 28px; }
+
+    /* Steps */
+    .step { display: none; }
+    .step.active { display: block; }
+
+    /* Demo box */
+    .demo-box {
+      background: rgba(59,130,246,.07);
+      border: 1px solid rgba(59,130,246,.2);
+      border-radius: 10px; padding: 10px 14px;
+      margin-bottom: 16px;
+    }
+    .demo-summary {
+      cursor: pointer; font-size: 12px; font-weight: 600;
+      color: var(--primary); user-select: none;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .demo-body { margin-top: 8px; }
+    .demo-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+    .demo-row code { background: var(--input-bg); border-radius: 4px; padding: 2px 6px; font-size: 11px; color: var(--text); }
+    .copy-btn { margin-left: auto; background: var(--primary); border: none; border-radius: 5px; color: #fff; font-size: 11px; font-weight: 600; padding: 3px 9px; cursor: pointer; }
+    .copy-btn:hover { background: var(--primary-h); }
+
+    /* Alert */
+    .alert { display: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+    .alert.show { display: block; }
+    .alert.error   { background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.2); }
+    .alert.success { background: rgba(34,197,94,.12);  color: #86efac; border: 1px solid rgba(34,197,94,.2); }
+
+    /* Fields */
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
+    .iw { position: relative; display: flex; align-items: center; }
+    .iw > svg { position: absolute; left: 12px; width: 16px; height: 16px; fill: var(--muted); flex-shrink: 0; pointer-events: none; z-index: 1; }
+    .iw input { width: 100%; padding: 11px 44px 11px 38px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 14px; outline: none; transition: border-color .2s, box-shadow .2s; font-family: inherit; box-sizing: border-box; }
+    .iw input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+    .eye-btn { position: absolute; right: 0; top: 0; bottom: 0; width: 40px; background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; z-index: 2; }
+    .eye-btn svg { fill: var(--muted); width: 20px; height: 20px; pointer-events: none; display: block; }
+    .eye-btn:hover svg { fill: var(--text); }
+
+    /* Remember / forgot */
+    .rm-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; font-size: 13px; }
+    .rm-row label { display: flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; }
+    .rm-row a { color: var(--primary); text-decoration: none; font-size: 12px; }
+    .rm-row a:hover { text-decoration: underline; }
+
+    /* Optional email */
+    .opt-toggle-btn { display: inline-flex; align-items: center; gap: 4px; background: none; border: none; color: var(--primary); font-size: 12.5px; cursor: pointer; margin-bottom: 12px; font-family: inherit; padding: 0; }
+    .opt-toggle-btn:hover { text-decoration: underline; }
+    .opt-field { display: none; }
+    .opt-field.show { display: block; }
+
+    /* Main button */
+    .btn { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s; font-family: inherit; }
+    .btn:hover { background: var(--primary-h); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* Divider */
+    .divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 14px; color: var(--muted); font-size: 12px; }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+    /* SSO buttons */
+    .sso-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .sso-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color .2s, background .2s; font-family: inherit; }
+    .sso-btn:hover { background: #1a2030; border-color: var(--muted); }
+    .sso-btn:disabled { opacity: .55; cursor: not-allowed; }
+    .sso-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .no-acct { text-align: center; font-size: 13px; color: var(--muted); }
+    .no-acct a { color: var(--primary); text-decoration: none; font-weight: 600; }
+
+    /* OTP step */
+    .back-link { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: var(--primary); font-size: 13px; cursor: pointer; margin-bottom: 20px; font-family: inherit; padding: 0; }
+    .back-link svg { width: 16px; height: 16px; fill: currentColor; }
+    .step h1 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .step > p.subtitle { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .info-box { background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.2); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
+    .otp-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+    .otp-input { width: 44px; height: 52px; text-align: center; font-size: 20px; font-weight: 700; border-radius: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); outline: none; font-family: inherit; transition: border-color .2s; }
+    .otp-input:focus { border-color: var(--primary); }
+    .otp-input.err { border-color: var(--danger); animation: fva-shake .35s; }
+    @keyframes fva-shake { 0%,100%{ transform:translateX(0); } 20%{ transform:translateX(-5px); } 60%{ transform:translateX(5px); } }
+    .resend-row { text-align: center; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    #resend-btn { background: none; border: none; color: var(--primary); font-size: 13px; cursor: pointer; font-family: inherit; }
+    #resend-btn:disabled { color: var(--muted); cursor: not-allowed; }
+
+    /* Success */
+    .success-screen { text-align: center; padding: 40px 0; }
+    .check-circle { width: 72px; height: 72px; border-radius: 50%; background: rgba(34,197,94,.12); border: 2px solid var(--success); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+    .check-circle svg { width: 36px; height: 36px; fill: var(--success); }
+    .success-screen h2 { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .success-screen p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .left-panel { display: none; }
+      .right-panel { padding: 24px 20px; }
+      body { overflow: auto; }
+    }
+  </style>
+  <!-- Local libraries — no CDN rate limiting -->
+  <script src="emailjs-4.min.js"></script>
+  <script src="msal-browser.min.js"></script>
+</head>
+<body>
+<div class="page">
+
+  <!-- ════ LEFT PANEL ════ -->
+  <div class="left-panel">
+    <video class="bg-video" autoplay muted loop playsinline>
+      <source src="login-bg.mp4" type="video/mp4" />
+    </video>
+    <div class="vid-overlay"></div>
+    <div class="brand">
+      <h1 class="brand-title">Fuel Variance<br/>Audit System</h1>
+      <p class="brand-sub">Sky Bridge Logistics &mdash; Load/Offload Variance &amp; Investigations</p>
+    </div>
+    <div class="dots-grid">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <!-- ════ RIGHT PANEL ════ -->
+  <div class="right-panel">
+    <!-- Audit network animation — canvas injected by JS -->
+    <div class="topo-bg">
+      <canvas id="audit-canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+      <div class="topo-l1" style="display:none">
+        <svg viewBox="0 0 1200 1800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#38bdf8" fill="none">
+            <!-- First half: y 22–877 -->
+            <path stroke-width="1.2" d="M0,22 C100,8 200,36 300,12 S480,34 560,10 S720,36 800,8 S960,32 1040,12 L1200,14"/>
+            <path stroke-width="1.6" d="M0,67 C90,77 190,57 290,81 S460,55 540,79 S700,53 780,81 S940,57 1020,77 L1200,75"/>
+            <path stroke-width="1.0" d="M0,112 C110,100 210,128 310,98 S475,126 565,96 S725,124 815,100 S975,126 1065,98 L1200,102"/>
+            <path stroke-width="1.4" d="M0,157 C85,171 185,145 285,167 S455,143 545,171 S705,147 795,169 S955,145 1045,169 L1200,167"/>
+            <path stroke-width="1.8" d="M0,202 C100,188 200,216 300,192 S480,214 560,190 S720,216 800,188 S960,212 1040,192 L1200,194"/>
+            <path stroke-width="1.2" d="M0,247 C90,257 190,237 290,261 S460,235 540,259 S700,233 780,261 S940,237 1020,257 L1200,255"/>
+            <path stroke-width="1.0" d="M0,292 C110,280 210,308 310,278 S475,306 565,276 S725,304 815,280 S975,306 1065,278 L1200,282"/>
+            <path stroke-width="1.4" d="M0,337 C85,351 185,325 285,347 S455,323 545,351 S705,327 795,349 S955,325 1045,349 L1200,347"/>
+            <path stroke-width="1.6" d="M0,382 C100,368 200,396 300,372 S480,394 560,370 S720,396 800,368 S960,392 1040,372 L1200,374"/>
+            <path stroke-width="1.2" d="M0,427 C90,437 190,417 290,441 S460,415 540,439 S700,413 780,441 S940,417 1020,437 L1200,435"/>
+            <path stroke-width="1.0" d="M0,472 C110,460 210,488 310,458 S475,486 565,456 S725,484 815,460 S975,486 1065,458 L1200,462"/>
+            <path stroke-width="1.8" d="M0,517 C85,531 185,505 285,527 S455,503 545,531 S705,507 795,529 S955,505 1045,529 L1200,527"/>
+            <path stroke-width="1.2" d="M0,562 C100,548 200,576 300,552 S480,574 560,550 S720,576 800,548 S960,572 1040,552 L1200,554"/>
+            <path stroke-width="1.4" d="M0,607 C90,617 190,597 290,621 S460,595 540,619 S700,593 780,621 S940,597 1020,617 L1200,615"/>
+            <path stroke-width="1.0" d="M0,652 C110,640 210,668 310,638 S475,666 565,636 S725,664 815,640 S975,666 1065,638 L1200,642"/>
+            <path stroke-width="1.6" d="M0,697 C85,711 185,685 285,707 S455,683 545,711 S705,687 795,709 S955,685 1045,709 L1200,707"/>
+            <path stroke-width="1.2" d="M0,742 C100,728 200,756 300,732 S480,754 560,730 S720,756 800,728 S960,752 1040,732 L1200,734"/>
+            <path stroke-width="1.4" d="M0,787 C90,797 190,777 290,801 S460,775 540,799 S700,773 780,801 S940,777 1020,797 L1200,795"/>
+            <path stroke-width="1.0" d="M0,832 C110,820 210,848 310,818 S475,846 565,816 S725,844 815,820 S975,846 1065,818 L1200,822"/>
+            <path stroke-width="1.8" d="M0,877 C85,891 185,865 285,887 S455,863 545,891 S705,867 795,889 S955,865 1045,889 L1200,887"/>
+            <!-- Second half (exact clone +900): seamless loop -->
+            <path stroke-width="1.2" d="M0,922 C100,908 200,936 300,912 S480,934 560,910 S720,936 800,908 S960,932 1040,912 L1200,914"/>
+            <path stroke-width="1.6" d="M0,967 C90,977 190,957 290,981 S460,955 540,979 S700,953 780,981 S940,957 1020,977 L1200,975"/>
+            <path stroke-width="1.0" d="M0,1012 C110,1000 210,1028 310,998 S475,1026 565,996 S725,1024 815,1000 S975,1026 1065,998 L1200,1002"/>
+            <path stroke-width="1.4" d="M0,1057 C85,1071 185,1045 285,1067 S455,1043 545,1071 S705,1047 795,1069 S955,1045 1045,1069 L1200,1067"/>
+            <path stroke-width="1.8" d="M0,1102 C100,1088 200,1116 300,1092 S480,1114 560,1090 S720,1116 800,1088 S960,1112 1040,1092 L1200,1094"/>
+            <path stroke-width="1.2" d="M0,1147 C90,1157 190,1137 290,1161 S460,1135 540,1159 S700,1133 780,1161 S940,1137 1020,1157 L1200,1155"/>
+            <path stroke-width="1.0" d="M0,1192 C110,1180 210,1208 310,1178 S475,1206 565,1176 S725,1204 815,1180 S975,1206 1065,1178 L1200,1182"/>
+            <path stroke-width="1.4" d="M0,1237 C85,1251 185,1225 285,1247 S455,1223 545,1251 S705,1227 795,1249 S955,1225 1045,1249 L1200,1247"/>
+            <path stroke-width="1.6" d="M0,1282 C100,1268 200,1296 300,1272 S480,1294 560,1270 S720,1296 800,1268 S960,1292 1040,1272 L1200,1274"/>
+            <path stroke-width="1.2" d="M0,1327 C90,1337 190,1317 290,1341 S460,1315 540,1339 S700,1313 780,1341 S940,1317 1020,1337 L1200,1335"/>
+            <path stroke-width="1.0" d="M0,1372 C110,1360 210,1388 310,1358 S475,1386 565,1356 S725,1384 815,1360 S975,1386 1065,1358 L1200,1362"/>
+            <path stroke-width="1.8" d="M0,1417 C85,1431 185,1405 285,1427 S455,1403 545,1431 S705,1407 795,1429 S955,1405 1045,1429 L1200,1427"/>
+            <path stroke-width="1.2" d="M0,1462 C100,1448 200,1476 300,1452 S480,1474 560,1450 S720,1476 800,1448 S960,1472 1040,1452 L1200,1454"/>
+            <path stroke-width="1.4" d="M0,1507 C90,1517 190,1497 290,1521 S460,1495 540,1519 S700,1493 780,1521 S940,1497 1020,1517 L1200,1515"/>
+            <path stroke-width="1.0" d="M0,1552 C110,1540 210,1568 310,1538 S475,1566 565,1536 S725,1564 815,1540 S975,1566 1065,1538 L1200,1542"/>
+            <path stroke-width="1.6" d="M0,1597 C85,1611 185,1585 285,1607 S455,1583 545,1611 S705,1587 795,1609 S955,1585 1045,1609 L1200,1607"/>
+            <path stroke-width="1.2" d="M0,1642 C100,1628 200,1656 300,1632 S480,1654 560,1630 S720,1656 800,1628 S960,1652 1040,1632 L1200,1634"/>
+            <path stroke-width="1.4" d="M0,1687 C90,1697 190,1677 290,1701 S460,1675 540,1699 S700,1673 780,1701 S940,1677 1020,1697 L1200,1695"/>
+            <path stroke-width="1.0" d="M0,1732 C110,1720 210,1748 310,1718 S475,1746 565,1716 S725,1744 815,1720 S975,1746 1065,1718 L1200,1722"/>
+            <path stroke-width="1.8" d="M0,1777 C85,1791 185,1765 285,1787 S455,1763 545,1791 S705,1767 795,1789 S955,1765 1045,1789 L1200,1787"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="card">
+
+
+      <div class="logo-row">
+        <div class="logo-icon"><img src="fva-logo.png" alt="FVA Logo" /></div>
+      </div>
+      <h1 class="card-title">Hello! Welcome back</h1>
+      <p class="card-sub">Sign in to Fuel Variance Audit</p>
+
+      <!-- STEP 1 -->
+      <div class="step active" id="step-1">
+
+        <div class="demo-box" id="demo-box">
+          <div class="demo-summary" onclick="toggleDemo()">&#9658; Admin credentials (quick access)</div>
+          <div class="demo-body" id="demo-body" style="display:none;">
+            <div class="demo-row"><span>Username</span><code>a.olatotse</code><button class="copy-btn" onclick="fillDemo()">Use</button></div>
+            <div class="demo-row"><span>Password</span><code>FuelAudit@2026!</code></div>
+            <div class="demo-row"><span>Phone 2FA</span><code>SMS → your registered number</code></div>
+          </div>
+        </div>
+
+        <div id="alert-1" class="alert error"></div>
+
+        <div class="field">
+          <label for="username">Username</label>
+          <div class="iw">
+            <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+            <input type="text" id="username" placeholder="Enter your username" autocomplete="username" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="iw">
+            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.8-2.2-5-5-5S7 3.2 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.7 1.4-3.1 3.1-3.1s3.1 1.4 3.1 3.1v2z"/></svg>
+            <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" />
+            <button class="eye-btn" type="button" onclick="togglePwd()" title="Show/hide password">
+              <svg id="eye-icon" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="rm-row">
+          <label><input type="checkbox" id="remember" /> Remember me</label>
+          <a href="#">Reset Password!</a>
+        </div>
+
+        <button class="btn" id="login-btn" onclick="submitCredentials()">Login</button>
+
+        <div class="divider"><span>or</span></div>
+
+        <div class="sso-row">
+          <button class="sso-btn" id="ms-btn" onclick="signInMicrosoft()">
+            <svg viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+            Microsoft
+          </button>
+          <button class="sso-btn" id="zoho-btn" onclick="signInZoho()">
+            <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="#E42527"/><text x="50%" y="57%" dominant-baseline="middle" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="bold" fill="#fff">Z</text></svg>
+            Zoho
+          </button>
+        </div>
+
+        <p class="no-acct">Don't have an account? <a href="#">Contact Admin</a></p>
+      </div>
+
+      <!-- STEP 2: Phone 2FA -->
+      <div class="step" id="step-2">
+        <button class="back-link" onclick="goBack()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          Back
+        </button>
+        <h1>Phone Verification</h1>
+        <p class="subtitle">Enter the 6-digit code sent to your phone.</p>
+        <div id="info-phone" class="info-box"></div>
+        <div id="alert-2" class="alert error"></div>
+        <div class="otp-row">
+          <input type="text" maxlength="1" class="otp-input" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-input" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-input" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-input" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-input" inputmode="numeric" pattern="[0-9]*" />
+          <input type="text" maxlength="1" class="otp-input" inputmode="numeric" pattern="[0-9]*" />
+        </div>
+        <div class="resend-row">
+          Didn't receive a code?
+          <button id="resend-btn" onclick="resendSMSOTP()" disabled>Resend in <span id="countdown">60</span>s</button>
+        </div>
+        <button class="btn" id="verify-btn" onclick="verifyPhoneOTP()">Verify &amp; Sign In</button>
+      </div>
+
+      <!-- STEP 3: Success -->
+      <div class="step" id="step-3">
+        <div class="success-screen">
+          <div class="check-circle">
+            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          </div>
+          <h2>Access Granted</h2>
+          <p>You have been authenticated successfully.<br/>Redirecting to dashboard&hellip;</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  /* demo box toggle */
+  function toggleDemo() {
+    var body = document.getElementById('demo-body');
+    var sum  = document.querySelector('.demo-summary');
+    var open = body.style.display === 'block';
+    body.style.display = open ? 'none' : 'block';
+    sum.innerHTML = (open ? '&#9658;' : '&#9660;') + ' Admin credentials (quick access)';
+  }
+
+  /* EmailJS retained for possible future use */
+  var EMAILJS_PUBLIC_KEY  = 'vfhhXCc1B-W9qEH0z';
+  if (typeof emailjs !== 'undefined') emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+
+  /* SSO client IDs */
+  var AZURE_CLIENT_ID = 'YOUR_AZURE_CLIENT_ID';
+  var ZOHO_CLIENT_ID  = 'YOUR_ZOHO_CLIENT_ID';
+
+  /* State */
+  var generatedOTP   = '';
+  var countdownTimer = null;
+  var pwdVisible     = false;
+
+  /* Helpers */
+  function showStep(n) {
+    document.querySelectorAll('.step').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('step-' + n).classList.add('active');
+  }
+  function showAlert(id, msg, type) {
+    var el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = 'alert ' + (type || 'error') + ' show';
+  }
+  function clearAlert(id) {
+    var el = document.getElementById(id);
+    el.className = 'alert'; el.textContent = '';
+  }
+
+  /* Password toggle */
+  function togglePwd() {
+    var inp = document.getElementById('password');
+    pwdVisible = !pwdVisible;
+    inp.type = pwdVisible ? 'text' : 'password';
+    document.getElementById('eye-icon').innerHTML = pwdVisible
+      ? '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>'
+      : '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
+  }
+
+  function generateOTP() { return Math.floor(100000 + Math.random() * 900000).toString(); }
+
+  function startCountdown() {
+    var secs = 60;
+    var btn = document.getElementById('resend-btn');
+    var counter = document.getElementById('countdown');
+    btn.disabled = true; counter.textContent = secs;
+    clearInterval(countdownTimer);
+    countdownTimer = setInterval(function() {
+      secs--; counter.textContent = secs;
+      if (secs <= 0) { clearInterval(countdownTimer); btn.disabled = false; btn.textContent = 'Resend code'; }
+    }, 1000);
+  }
+
+  /* djb2-XOR hash */
+  function _fvaH(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+  }
+
+  /* Valid users — update phone numbers with real E.164 values e.g. +26771234567 */
+  var VALID_USERS = [
+    { username: 'a.olatotse',     pwh: _fvaH('FuelAudit@2026!'), email: 'aaolatotse1@gmail.com',                        name: 'Aobakwe Olatotse',    role: 'admin',    phone: '+26776733163' },
+    { username: 'p.gaotlhobogwe', pwh: _fvaH('FuelAudit@2026!'), email: 'prince.gaotlhobogwe@skybridgelogistics.co.bw', name: 'Prince Gaotlhobogwe', role: 'admin',    phone: '+26772345678' },
+    { username: 'g.mogorosi',     pwh: _fvaH('FuelAudit@2026!'), email: 'goitse.mogorosi@skybridgelogistics.co.bw',      name: 'Goitse Mogorosi',     role: 'dispatch', phone: '+26773456789' }
+  ];
+
+  /* Phone 2FA state */
+  var pendingPhone = '';
+  var pendingToken = null;
+  var pendingUser  = null;
+
+  function fillDemo() {
+    document.getElementById('username').value = VALID_USERS[0].username;
+    document.getElementById('password').value = 'FuelAudit@2026!';
+  }
+
+  var FVA_API = localStorage.getItem('fva:api-url') || 'http://localhost:5000';
+
+  /* Step 1 — verify username + password then trigger phone 2FA */
+  async function submitCredentials() {
+    clearAlert('alert-1');
+    var username = document.getElementById('username').value.trim();
+    var password = document.getElementById('password').value;
+    if (!username) { showAlert('alert-1', 'Username is required.'); return; }
+    if (!password) { showAlert('alert-1', 'Password is required.'); return; }
+
+    var localUser = VALID_USERS.find(function(u){ return u.username === username; });
+    if (!localUser || localUser.pwh !== _fvaH(password)) {
+      showAlert('alert-1', 'Invalid username or password.'); return;
+    }
+
+    var btn = document.getElementById('login-btn');
+    btn.disabled = true; btn.textContent = 'Verifying…';
+
+    try {
+      var res = await fetch(FVA_API + '/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: password })
+      });
+      var data = await res.json();
+      if (!res.ok) { showAlert('alert-1', data.error || 'Login failed.'); btn.disabled=false; btn.textContent='Login'; return; }
+      pendingToken = data.token;
+      pendingUser  = data.user;
+    } catch(e) {
+      /* Server offline — fall back to local auth, defer token */
+      pendingToken = null;
+      pendingUser  = { username: localUser.username, name: localUser.name, email: localUser.email, role: localUser.role };
+    }
+
+    btn.disabled = false; btn.textContent = 'Login';
+    pendingPhone = localUser.phone || '';
+    await sendSMSOTP(pendingPhone);
+  }
+
+  /* Step 2 — send SMS OTP via TextBelt (free tier) with demo fallback */
+  async function sendSMSOTP(phone) {
+    generatedOTP = generateOTP();
+    var digits = phone.replace(/\D/g, '');
+    var masked = phone.slice(0, -4).replace(/[0-9]/g, '•') + phone.slice(-4);
+    var infoEl = document.getElementById('info-phone');
+    try {
+      var res = await fetch('https://textbelt.com/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone, message: 'FVA code: ' + generatedOTP + '. Do not share this.', key: 'textbelt' })
+      });
+      var rd = await res.json();
+      infoEl.textContent = rd.success
+        ? 'Code sent to ' + masked + '. Check your SMS messages.'
+        : 'Demo mode — code for ' + masked + ': ' + generatedOTP;
+    } catch(e) {
+      infoEl.textContent = 'Demo mode — code for ' + masked + ': ' + generatedOTP;
+    }
+    showStep(2); setupOTPInputs(); startCountdown();
+  }
+
+  function setupOTPInputs() {
+    var inputs = document.querySelectorAll('.otp-input');
+    inputs.forEach(function(inp, i) {
+      inp.value = '';
+      inp.addEventListener('input', function() { inp.value = inp.value.replace(/\D/g,'').slice(0,1); if (inp.value && i < inputs.length-1) inputs[i+1].focus(); });
+      inp.addEventListener('keydown', function(e) { if (e.key==='Backspace' && !inp.value && i>0) inputs[i-1].focus(); });
+      inp.addEventListener('paste', function(e) { e.preventDefault(); var p=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,''); Array.from(p).forEach(function(ch,j){ if(inputs[i+j]) inputs[i+j].value=ch; }); inputs[Math.min(i+p.length,inputs.length-1)].focus(); });
+    });
+    inputs[0].focus();
+  }
+
+  function verifyPhoneOTP() {
+    clearAlert('alert-2');
+    var entered = Array.from(document.querySelectorAll('.otp-input')).map(function(i){ return i.value; }).join('');
+    if (entered.length < 6) { showAlert('alert-2', 'Please enter all 6 digits.'); return; }
+    if (entered !== generatedOTP) {
+      showAlert('alert-2', 'Incorrect code. Please try again.');
+      document.querySelectorAll('.otp-input').forEach(function(i){ i.value=''; i.classList.add('err'); });
+      document.querySelector('.otp-input').focus();
+      setTimeout(function(){ document.querySelectorAll('.otp-input').forEach(function(i){ i.classList.remove('err'); }); }, 800);
+      return;
+    }
+    clearInterval(countdownTimer);
+    if (pendingToken) { try { sessionStorage.setItem('fva:auth-token', pendingToken); } catch(e){} }
+    try { sessionStorage.setItem('fva:current-user', JSON.stringify({ username: pendingUser.username, name: pendingUser.name, email: pendingUser.email, role: pendingUser.role })); } catch(e){}
+    showStep(3);
+    setTimeout(function(){ sessionStorage.setItem('fva:from-login','1'); window.location.href = 'FuelVarianceAudit_6.html'; }, 2500);
+  }
+
+  async function resendSMSOTP() {
+    clearAlert('alert-2'); generatedOTP = generateOTP();
+    var infoEl = document.getElementById('info-phone');
+    var masked = pendingPhone.slice(0,-4).replace(/[0-9]/g,'•') + pendingPhone.slice(-4);
+    try {
+      var res = await fetch('https://textbelt.com/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: pendingPhone, message: 'FVA code: ' + generatedOTP + '. Do not share this.', key: 'textbelt' })
+      });
+      var rd = await res.json();
+      if (!rd.success) infoEl.textContent = 'Demo mode — new code for ' + masked + ': ' + generatedOTP;
+    } catch(e) {
+      infoEl.textContent = 'Demo mode — new code for ' + masked + ': ' + generatedOTP;
+    }
+    document.querySelectorAll('.otp-input').forEach(function(i){ i.value=''; });
+    document.querySelector('.otp-input').focus();
+    startCountdown(); showAlert('alert-2', 'A new code has been sent.', 'success');
+  }
+
+  function goBack() { clearInterval(countdownTimer); clearAlert('alert-2'); showStep(1); }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    if (document.getElementById('step-1').classList.contains('active')) submitCredentials();
+    if (document.getElementById('step-2').classList.contains('active')) verifyPhoneOTP();
+  });
+
+  /* Microsoft SSO */
+  async function signInMicrosoft() {
+    if (AZURE_CLIENT_ID === 'YOUR_AZURE_CLIENT_ID') { showAlert('alert-1', 'Microsoft SSO: add your Azure Client ID to the script config.'); return; }
+    var btn = document.getElementById('ms-btn');
+    btn.disabled = true; btn.textContent = 'Connecting...';
+    try {
+      var msalApp = new msal.PublicClientApplication({ auth: { clientId: AZURE_CLIENT_ID, authority: 'https://login.microsoftonline.com/common', redirectUri: window.location.href.split('?')[0].split('#')[0] }, cache: { cacheLocation: 'sessionStorage' } });
+      await msalApp.initialize();
+      var result = await msalApp.loginPopup({ scopes: ['openid','email','profile'] });
+      if (result && result.account) { showStep(3); setTimeout(function(){ sessionStorage.setItem('fva:from-login','1'); window.location.href='FuelVarianceAudit_6.html'; }, 2000); }
+    } catch(err) {
+      if (err.errorCode !== 'user_cancelled') showAlert('alert-1', 'Microsoft sign-in failed: ' + (err.message||err));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<svg viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Microsoft';
+    }
+  }
+
+  /* Zoho SSO */
+  function signInZoho() {
+    if (ZOHO_CLIENT_ID === 'YOUR_ZOHO_CLIENT_ID') { showAlert('alert-1', 'Zoho SSO: add your Zoho Client ID to the script config.'); return; }
+    var base = window.location.href.split('?')[0].split('#')[0];
+    window.location.href = 'https://accounts.zoho.com/oauth/v2/auth?' + new URLSearchParams({ client_id: ZOHO_CLIENT_ID, response_type: 'token', redirect_uri: base, scope: 'AaaServer.profile.READ', prompt: 'consent' }).toString();
+  }
+
+  /* Zoho callback */
+  (function() {
+    var hash = window.location.hash;
+    if (!hash.includes('access_token')) return;
+    var token = new URLSearchParams(hash.replace(/^#/,'')).get('access_token');
+    if (token) { history.replaceState(null,'',window.location.pathname); showStep(3); setTimeout(function(){ sessionStorage.setItem('fva:from-login','1'); window.location.href='FuelVarianceAudit_6.html'; }, 2000); }
+  })();
+
+  /* ── Audit background: line graph + cluster scatter ── */
+  (function(){
+    var cv = document.getElementById('audit-canvas');
+    if(!cv) return;
+    var ctx = cv.getContext('2d');
+    var rp  = document.querySelector('.right-panel');
+    var W, H;
+    function resize(){
+      W = cv.width  = rp ? rp.offsetWidth  : window.innerWidth;
+      H = cv.height = rp ? rp.offsetHeight : window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    var PAL = ['56,189,248','251,191,36','167,139,250']; /* cyan / amber / violet */
+
+    /* ── Line graph data (300-point circular buffer per series) ── */
+    var BUF = 300;
+    var series = PAL.map(function(_,i){
+      var d=[], v=28+i*18+Math.random()*14;
+      for(var k=0;k<BUF;k++){ v+=(Math.random()-.5)*10; v=Math.max(5,Math.min(93,v)); d.push(v); }
+      return d;
+    });
+
+    /* ── Cluster scatter ── */
+    var CLS = [
+      {nx:0.18,ny:0.70,rx:0.09,ry:0.13,ci:0,lbl:'Acceptable'},
+      {nx:0.57,ny:0.52,rx:0.10,ry:0.14,ci:1,lbl:'Flagged'},
+      {nx:0.84,ny:0.33,rx:0.08,ry:0.12,ci:2,lbl:'Critical'}
+    ];
+    var dots=[];
+    CLS.forEach(function(cl){
+      for(var i=0;i<22;i++){
+        var a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random());
+        dots.push({
+          nx:cl.nx+Math.cos(a)*cl.rx*r, ny:cl.ny+Math.sin(a)*cl.ry*r,
+          ox:(Math.random()-.5)*.014, oy:(Math.random()-.5)*.014,
+          ph:Math.random()*Math.PI*2, sp:0.28+Math.random()*.55,
+          r:1.3+Math.random()*2.1, ci:cl.ci
+        });
+      }
+    });
+
+    var scroll=0, tick=0, fn=0;
+
+    /* ── LINE GRAPH (top ~48% of canvas) ── */
+    function drawLines(){
+      var ml=44,mr=14,mt=22,mb=28;
+      var cw=W-ml-mr, ch=H*.48-mt-mb;
+      var ox=ml, oy=mt, bot=oy+ch;
+
+      /* dashed grid */
+      ctx.setLineDash([2,6]); ctx.lineWidth=.5; ctx.strokeStyle='rgba(56,189,248,.06)';
+      for(var i=0;i<=4;i++){ var yy=oy+ch*i/4; ctx.beginPath();ctx.moveTo(ox,yy);ctx.lineTo(ox+cw,yy);ctx.stroke(); }
+      for(var i=0;i<=5;i++){ var xx=ox+cw*i/5; ctx.beginPath();ctx.moveTo(xx,oy);ctx.lineTo(xx,bot);ctx.stroke(); }
+      ctx.setLineDash([]);
+
+      /* axes */
+      ctx.strokeStyle='rgba(56,189,248,.20)'; ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,bot);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(ox,bot);ctx.lineTo(ox+cw,bot);ctx.stroke();
+
+      /* y-axis ticks & labels */
+      ctx.fillStyle='rgba(56,189,248,.20)'; ctx.font='8px monospace'; ctx.textAlign='right';
+      ['100%','75%','50%','25%','0%'].forEach(function(v,i){
+        var yy=oy+ch*i/4;
+        ctx.beginPath();ctx.moveTo(ox-3,yy);ctx.lineTo(ox,yy);ctx.stroke();
+        ctx.fillText(v,ox-5,yy+3);
+      });
+
+      /* section title + x-label */
+      ctx.fillStyle='rgba(56,189,248,.22)'; ctx.textAlign='left'; ctx.font='9px monospace';
+      ctx.fillText('VARIANCE TREND',ox,oy-7);
+      ctx.fillStyle='rgba(56,189,248,.13)'; ctx.textAlign='center';
+      ctx.fillText('─── Time ───',ox+cw/2,bot+17);
+
+      /* series */
+      var npts=Math.ceil(cw/5)+2, step=cw/(npts-1);
+      var off=Math.floor(scroll), frac=scroll-off;
+      series.forEach(function(d,si){
+        var rgb=PAL[si], pts=[];
+        for(var i=0;i<npts;i++){ var idx=(off+i)%BUF; pts.push({x:ox+(i-frac)*step, y:oy+ch*(1-d[idx]/100)}); }
+
+        ctx.save(); ctx.beginPath();ctx.rect(ox,oy,cw,ch+2);ctx.clip();
+
+        /* area fill */
+        ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+        for(var i=1;i<pts.length-1;i++){ var mx=(pts[i].x+pts[i+1].x)/2,my=(pts[i].y+pts[i+1].y)/2; ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my); }
+        ctx.lineTo(pts[pts.length-1].x,bot); ctx.lineTo(pts[0].x,bot); ctx.closePath();
+        ctx.fillStyle='rgba('+rgb+',.05)'; ctx.fill();
+
+        /* line */
+        ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+        for(var i=1;i<pts.length-1;i++){ var mx=(pts[i].x+pts[i+1].x)/2,my=(pts[i].y+pts[i+1].y)/2; ctx.quadraticCurveTo(pts[i].x,pts[i].y,mx,my); }
+        ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
+        ctx.strokeStyle='rgba('+rgb+',.42)'; ctx.lineWidth=1.6; ctx.stroke();
+
+        /* leading dot */
+        var lp=pts[pts.length-1];
+        ctx.fillStyle='rgba('+rgb+',.75)'; ctx.beginPath();ctx.arc(lp.x,lp.y,2.8,0,6.283);ctx.fill();
+        ctx.restore();
+      });
+
+      /* legend */
+      ['Load Var','Offload Var','Avg Δ'].forEach(function(lbl,i){
+        ctx.fillStyle='rgba('+PAL[i]+',.5)'; ctx.fillRect(ox+8+i*78,oy+8,12,2);
+        ctx.fillStyle='rgba('+PAL[i]+',.28)'; ctx.font='8px monospace'; ctx.textAlign='left';
+        ctx.fillText(lbl,ox+23+i*78,oy+12);
+      });
+    }
+
+    /* ── CLUSTER SCATTER (bottom ~44% of canvas) ── */
+    function drawScatter(){
+      var ml=44,mr=14,mb=20;
+      var sy0=H*.54+20, sy1=H-mb, sx0=ml, sx1=W-mr;
+      var sw=sx1-sx0, sh=sy1-sy0;
+
+      /* title + divider */
+      ctx.fillStyle='rgba(56,189,248,.22)'; ctx.font='9px monospace'; ctx.textAlign='left';
+      ctx.fillText('CLUSTER ANALYSIS',sx0,sy0-9);
+      ctx.strokeStyle='rgba(56,189,248,.09)'; ctx.lineWidth=.5; ctx.setLineDash([3,7]);
+      ctx.beginPath();ctx.moveTo(sx0,sy0-4);ctx.lineTo(sx1,sy0-4);ctx.stroke();
+      ctx.setLineDash([]);
+
+      /* grid */
+      ctx.strokeStyle='rgba(56,189,248,.04)'; ctx.lineWidth=.5; ctx.setLineDash([2,5]);
+      for(var i=0;i<=4;i++){
+        var yy=sy0+sh*i/4; ctx.beginPath();ctx.moveTo(sx0,yy);ctx.lineTo(sx1,yy);ctx.stroke();
+        var xx=sx0+sw*i/4; ctx.beginPath();ctx.moveTo(xx,sy0);ctx.lineTo(xx,sy1);ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      /* axes */
+      ctx.strokeStyle='rgba(56,189,248,.18)'; ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(sx0,sy0);ctx.lineTo(sx0,sy1);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(sx0,sy1);ctx.lineTo(sx1,sy1);ctx.stroke();
+
+      /* axis labels */
+      ctx.fillStyle='rgba(56,189,248,.16)'; ctx.font='8px monospace';
+      ctx.textAlign='center'; ctx.fillText('Volume (L)',sx0+sw/2,sy1+14);
+      ctx.save(); ctx.translate(sx0-15,sy0+sh/2); ctx.rotate(-Math.PI/2);
+      ctx.textAlign='center'; ctx.fillText('Variance %',0,0); ctx.restore();
+
+      /* cluster ellipses + labels */
+      CLS.forEach(function(cl){
+        var ex=sx0+cl.nx*sw, ey=sy0+cl.ny*sh;
+        ctx.strokeStyle='rgba('+PAL[cl.ci]+',.15)'; ctx.lineWidth=.8; ctx.setLineDash([3,5]);
+        ctx.beginPath(); ctx.ellipse(ex,ey,cl.rx*sw,cl.ry*sh,0,0,Math.PI*2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle='rgba('+PAL[cl.ci]+',.30)'; ctx.font='8px monospace'; ctx.textAlign='center';
+        ctx.fillText(cl.lbl,ex,ey-cl.ry*sh-5);
+      });
+
+      /* dots */
+      dots.forEach(function(d){
+        var px=sx0+(d.nx+Math.sin(tick*d.sp+d.ph)*d.ox)*sw;
+        var py=sy0+(d.ny+Math.cos(tick*d.sp+d.ph)*d.oy)*sh;
+        if(px<sx0||px>sx1||py<sy0||py>sy1) return;
+        var rgb=PAL[d.ci];
+        ctx.fillStyle='rgba('+rgb+',.07)'; ctx.beginPath();ctx.arc(px,py,d.r*3.5,0,6.283);ctx.fill();
+        ctx.fillStyle='rgba('+rgb+',.58)'; ctx.beginPath();ctx.arc(px,py,d.r,0,6.283);ctx.fill();
+      });
+    }
+
+    function animate(){
+      tick+=.014; scroll+=.16;
+      if(scroll>=BUF) scroll-=BUF;
+      /* refresh a data point every 30 frames so lines stay dynamic */
+      if(++fn%30===0){
+        series.forEach(function(d){
+          var v=d[d.length-1]+(Math.random()-.5)*12;
+          d.push(Math.max(5,Math.min(93,v))); d.shift();
+        });
+      }
+      ctx.clearRect(0,0,W,H);
+      drawLines();
+      drawScatter();
+      requestAnimationFrame(animate);
+    }
+    animate();
+  })();
+</script>
+</body>
+</html>

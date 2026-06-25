@@ -1,0 +1,69 @@
+# ── Secrets & credentials ──────────────────────────────
+.fva_secret
+.fva_zoho_config
+self_client.json
+self_client (1).json
+
+# ── Database files ──────────────────────────────────────
+fva_auth.db
+fva_auth.db-shm
+fva_auth.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# ── Backups ─────────────────────────────────────────────
+*.bak
+*.bak.*
+
+# ── Development / diagnostic scripts ───────────────────
+_*.py
+_*.txt
+_*.png
+_*.json
+
+# ── Debug & scratch files ───────────────────────────────
+Claude Code prompt.txt
+test-zoho-*.js
+get-zoho-token*.js
+get-zoho-info.js
+get-zoho-depts.js
+
+# ── Large binary / media ─────────────────────────────────
+login-bg.mp4
+
+# ── Generated reports & exports ─────────────────────────
+Investigation_Report_*.pdf
+*.pdf
+
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+.venv/
+env/
+
+# ── Node ────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editors ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
