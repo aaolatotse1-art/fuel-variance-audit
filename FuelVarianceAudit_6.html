@@ -4656,13 +4656,21 @@ function parseTrackerWorkbook(buffer, filename) {
       if(document.getElementById(BTN))return;
       var root=document.getElementById('root');if(!root)return;
       var btns=root.querySelectorAll('button'),docs=null,sett=null;
-      for(var i=0;i<btns.length;i++){var t=btns[i].textContent.trim();if(t==='Documents')docs=btns[i];if(t==='Settings')sett=btns[i];}
+      for(var i=0;i<btns.length;i++){
+        var t=(btns[i].textContent||'').trim();
+        /* match by last word to handle SVG icon title text prepended */
+        var last=t.split(/\s+/).pop()||'';
+        if(last==='Documents'||t==='Documents')docs=btns[i];
+        if(last==='Settings'||t==='Settings')sett=btns[i];
+      }
       if(!docs)return;
       var nb=document.createElement('button');
       nb.id=BTN;nb.type='button';nb.textContent='Fuel Consumption';
-      nb.setAttribute('style',docs.getAttribute('style')||'');
+      /* copy both className (React CSS) and any inline style */
+      nb.className=docs.className||'';
+      if(docs.getAttribute('style'))nb.setAttribute('style',docs.getAttribute('style'));
       nb.onclick=activate;
-      docs.parentElement.insertBefore(nb,sett);
+      docs.parentElement.insertBefore(nb,sett||null);
     }
 
     function activate(){
@@ -4682,8 +4690,7 @@ function parseTrackerWorkbook(buffer, filename) {
       var p=document.getElementById(PANEL),b=document.getElementById(BTN);
       if(p)p.style.display='none';
       if(b){
-        var root=document.getElementById('root');
-        if(root){var btns=root.querySelectorAll('button');for(var i=0;i<btns.length;i++){if(btns[i].textContent.trim()==='Documents'){b.setAttribute('style',btns[i].getAttribute('style')||'');break;}}}
+        b.style.background='';b.style.color='';b.style.borderColor='';
       }
     }
 
