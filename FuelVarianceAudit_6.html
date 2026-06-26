@@ -2132,9 +2132,6 @@ function parseTrackerWorkbook(buffer, filename) {
   /* Hide React-managed header elements that our overlay replaces */
   button[title='Sign out']{display:none!important;}
   header label{display:none!important;}
-  button[title='Sign out']+*,*+button[title='Sign out']{display:none!important;}
-  /* Hide role-badge span ("Admin"/"Viewer") rendered by React next to the sign-out button */
-  header div:has(>button[title='Sign out']){display:none!important;}
 
 </style>
 
@@ -4652,36 +4649,64 @@ function parseTrackerWorkbook(buffer, filename) {
       return Object.values(m).map(function(a){return Object.assign(a,{avgRate:a.td>0?a.fu/a.td*100:null});}).filter(function(a){return a.avgRate;}).sort(function(a,b){return b.avgRate-a.avgRate;});
     }
 
+    function _getSettBtn(){
+      var root=document.getElementById('root');if(!root)return null;
+      var btns=root.querySelectorAll('button');
+      for(var i=0;i<btns.length;i++){
+        var t=((btns[i].innerText||btns[i].textContent||'').trim());
+        if(t==='Settings'||t.endsWith('\nSettings')||t==='Settings\n')return btns[i];
+      }
+      return null;
+    }
+
+    function _reposBtn(){
+      var b=document.getElementById(BTN);if(!b)return;
+      var sett=_getSettBtn();if(!sett)return;
+      var r=sett.getBoundingClientRect();
+      b.style.top=r.top+'px';
+      b.style.height=r.height+'px';
+      /* position to the left of Settings after we know our own width */
+      requestAnimationFrame(function(){
+        var b2=document.getElementById(BTN);if(!b2)return;
+        var sett2=_getSettBtn();if(!sett2)return;
+        var r2=sett2.getBoundingClientRect();
+        b2.style.top=r2.top+'px';
+        b2.style.height=r2.height+'px';
+        b2.style.left=(r2.left-b2.offsetWidth-4)+'px';
+      });
+    }
+
     function inject(){
       if(document.getElementById(BTN))return;
-      var root=document.getElementById('root');if(!root)return;
-      var btns=root.querySelectorAll('button'),docs=null,sett=null;
-      for(var i=0;i<btns.length;i++){
-        var t=(btns[i].textContent||'').trim();
-        /* match by last word to handle SVG icon title text prepended */
-        var last=t.split(/\s+/).pop()||'';
-        if(last==='Documents'||t==='Documents')docs=btns[i];
-        if(last==='Settings'||t==='Settings')sett=btns[i];
-      }
-      if(!docs)return;
+      var sett=_getSettBtn();if(!sett)return;
       var nb=document.createElement('button');
       nb.id=BTN;nb.type='button';nb.textContent='Fuel Consumption';
-      /* copy both className (React CSS) and any inline style */
-      nb.className=docs.className||'';
-      if(docs.getAttribute('style'))nb.setAttribute('style',docs.getAttribute('style'));
+      var cs=window.getComputedStyle(sett);
+      nb.style.cssText=[
+        'position:fixed','z-index:202',
+        'background:transparent','border:none',
+        'border-bottom:2px solid transparent',
+        'font-family:'+cs.fontFamily,'font-size:'+cs.fontSize,
+        'font-weight:'+cs.fontWeight,'color:'+cs.color,
+        'letter-spacing:'+cs.letterSpacing,
+        'padding:'+cs.padding,'cursor:pointer','white-space:nowrap',
+        'display:inline-flex','align-items:center','top:-999px','left:-999px'
+      ].join(';');
       nb.onclick=activate;
-      docs.parentElement.insertBefore(nb,sett||null);
+      document.body.appendChild(nb);
+      _reposBtn();
+      window.addEventListener('resize',_reposBtn);
     }
 
     function activate(){
       _on=true;
       var p=document.getElementById(PANEL),b=document.getElementById(BTN);
       if(!p||!b)return;
-      var rect=b.parentElement.getBoundingClientRect();
+      var rect=b.getBoundingClientRect();
       p.style.top=Math.round(rect.bottom)+'px';
       p.style.display='flex';
-      b.style.cssText=b.getAttribute('style')||'';
-      b.style.background='var(--accent)';b.style.color='#fff';b.style.borderColor='var(--accent)';
+      b.style.background='var(--accent)';b.style.color='#fff';
+      b.style.borderBottom='2px solid var(--accent)';
       if(!_done){_done=true;_render();}
     }
 
@@ -4689,15 +4714,14 @@ function parseTrackerWorkbook(buffer, filename) {
       _on=false;
       var p=document.getElementById(PANEL),b=document.getElementById(BTN);
       if(p)p.style.display='none';
-      if(b){
-        b.style.background='';b.style.color='';b.style.borderColor='';
-      }
+      if(b){b.style.background='transparent';b.style.color='';b.style.borderBottom='2px solid transparent';}
     }
 
     document.addEventListener('click',function(ev){
       if(!_on)return;
       var btn=ev.target.closest('button');if(!btn||btn.id===BTN)return;
-      if(['Dashboard','Analytics','Drivers','Documents','Settings'].indexOf((btn.textContent||'').trim())!==-1)deactivate();
+      var t=(btn.innerText||btn.textContent||'').trim();
+      if(['Dashboard','Analytics','Drivers','Documents','Settings'].indexOf(t)!==-1)deactivate();
     },true);
 
     var _sortK='date',_sortD=-1,_recs=[];
