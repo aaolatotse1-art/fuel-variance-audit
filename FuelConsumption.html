@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Fuel Consumption Report — Sky Bridge Logistics</title>
+<link rel="icon" type="image/png" href="fva-logo.png">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+/* ── CSS variables (mirrors main FVA app) ── */
+:root{
+  --bg:#15191f;--surface:#1c222a;--surface-2:#242b35;--surface-3:#2e3744;
+  --surface-1:#1a2535;--border:#323b47;--text:#e7ebf0;--text-muted:#8b96a5;
+  --accent:#f5b942;--accent-soft:rgba(245,185,66,.12);
+  --danger:#ef5350;--danger-soft:rgba(239,83,80,.12);
+  --success:#5fd3a3;--success-soft:rgba(95,211,163,.12);
+  --info:#6fa8f5;--info-soft:rgba(111,168,245,.12);
+  --radius:8px;
+}
+html[data-theme=light]{
+  --bg:#f0f4f8;--surface:#fff;--surface-2:#f5f7fa;--surface-3:#e8ecf0;
+  --surface-1:#edf1f7;--border:#cdd5df;--text:#1a2535;--text-muted:#556070;
+  --accent:#c47f08;--accent-soft:rgba(196,127,8,.12);
+  --danger:#dc2626;--danger-soft:rgba(220,38,38,.12);
+  --success:#16a34a;--success-soft:rgba(22,163,74,.12);
+  --info:#2563eb;--info-soft:rgba(37,99,235,.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;
+  transition:background-color .25s,color .2s}
+
+/* ── Header ── */
+#fcr-hdr{position:sticky;top:0;z-index:100;background:var(--bg);
+  border-bottom:1px solid var(--border);display:flex;align-items:center;
+  gap:10px;padding:0 20px;height:60px;}
+.fcr-logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);}
+.fcr-logo img{height:34px;width:34px;object-fit:contain;}
+.fcr-logo-title{font-weight:700;font-size:15px;}
+.fcr-logo-sub{font-size:11px;color:var(--text-muted);}
+.sep{flex:1;}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);
+  color:var(--text);border:1px solid var(--border);border-radius:var(--radius);
+  padding:7px 13px;font-size:12.5px;font-weight:600;cursor:pointer;
+  transition:border-color .2s,background .2s;font-family:inherit;flex-shrink:0;}
+.btn:hover{border-color:var(--accent);background:var(--surface-3);}
+.btn.primary{background:var(--accent);color:#1a1200;border-color:var(--accent);}
+.btn.primary:hover{opacity:.9;}
+.btn svg{width:14px;height:14px;flex-shrink:0;}
+#fcr-theme-btn{width:34px;height:34px;padding:0;justify-content:center;}
+
+/* ── Main layout ── */
+#fcr-main{max-width:1400px;margin:0 auto;padding:24px 20px;display:flex;flex-direction:column;gap:24px;}
+
+/* ── Empty state ── */
+#fcr-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:60vh;gap:20px;text-align:center;}
+#fcr-empty svg{color:var(--text-muted);opacity:.4;}
+#fcr-empty h2{font-size:20px;font-weight:700;}
+#fcr-empty p{color:var(--text-muted);font-size:13.5px;max-width:480px;line-height:1.6;}
+.tpl-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 20px;text-align:left;max-width:600px;width:100%;}
+.tpl-box h4{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:10px;}
+.tpl-cols{display:flex;flex-wrap:wrap;gap:6px;}
+.tpl-col{background:var(--surface-2);border:1px solid var(--border);border-radius:4px;
+  padding:3px 9px;font-size:11.5px;font-family:Consolas,monospace;color:var(--text);}
+.tpl-col.req{border-color:var(--accent);color:var(--accent);}
+
+/* ── Content sections ── */
+#fcr-content{display:none;flex-direction:column;gap:24px;}
+#fcr-content.visible{display:flex;}
+.sec-hdr{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;
+  margin-bottom:14px;color:var(--text);}
+.sec-hdr svg{width:15px;height:15px;color:var(--accent);flex-shrink:0;}
+
+/* ── Summary cards ── */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+.card-label{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;}
+.card-val{font-size:22px;font-weight:700;}
+.card-val.good{color:var(--success);}
+.card-val.bad{color:var(--danger);}
+.card-val.warn{color:var(--accent);}
+.card-sub{font-size:11.5px;color:var(--text-muted);margin-top:5px;line-height:1.4;}
+
+/* ── Rankings ── */
+.rankings{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.rank-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.rank-hdr{padding:11px 16px;border-bottom:1px solid var(--border);font-size:12px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;}
+.rank-list{padding:12px 14px;}
+.rank-divider{font-size:10px;text-transform:uppercase;letter-spacing:.5px;
+  padding:6px 0 3px;display:flex;align-items:center;gap:6px;}
+.rank-divider span{flex:1;height:1px;background:var(--border);}
+.rank-row{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:center;
+  padding:6px 0;border-bottom:1px solid var(--border);}
+.rank-row:last-child{border-bottom:none;}
+.rank-pos{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.rank-pos.bad{background:var(--danger-soft);color:var(--danger);}
+.rank-pos.good{background:var(--success-soft);color:var(--success);}
+.rank-name{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rank-meta{font-size:10.5px;color:var(--text-muted);}
+.rank-val{font-size:12px;font-weight:700;font-family:Consolas,monospace;white-space:nowrap;text-align:right;}
+.rank-val.bad{color:var(--danger);}
+.rank-val.good{color:var(--success);}
+
+/* ── Charts ── */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+.chart-card canvas{width:100%;display:block;}
+
+/* ── Table ── */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.tbl-toolbar{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+#fcr-search{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;
+  padding:7px 12px;font-size:13px;color:var(--text);font-family:inherit;transition:border-color .2s;}
+#fcr-search:focus{outline:2px solid var(--accent);outline-offset:1px;}
+.tbl-outer{overflow-x:auto;}
+table.fcr-tbl{border-collapse:collapse;width:100%;min-width:1100px;}
+table.fcr-tbl th{padding:9px 13px;text-align:left;font-size:11px;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--text-muted);background:var(--surface-2);
+  border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none;}
+table.fcr-tbl th:hover{color:var(--text);}
+table.fcr-tbl th.active{color:var(--accent);}
+table.fcr-tbl td{padding:9px 13px;border-bottom:1px solid var(--border);
+  font-size:12.5px;white-space:nowrap;}
+table.fcr-tbl tr:last-child td{border-bottom:none;}
+table.fcr-tbl tr:hover td{background:var(--surface-2);}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;}
+.badge.ok{background:var(--success-soft);color:var(--success);}
+.badge.under{background:var(--danger-soft);color:var(--danger);}
+.badge.nodata{background:var(--surface-3);color:var(--text-muted);}
+
+/* ── Calculator modal ── */
+.modal-backdrop{display:none;position:fixed;inset:0;z-index:9000;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;}
+.modal-backdrop.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  width:480px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.45);}
+.modal-hdr{padding:15px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.modal-hdr h3{font-size:14px;font-weight:700;}
+.modal-body{padding:20px;}
+.close-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);
+  background:var(--surface-2);cursor:pointer;color:var(--text);
+  display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.close-btn:hover{background:var(--surface-3);}
+.calc-result{background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:18px;margin-top:16px;text-align:center;}
+.calc-result-val{font-size:36px;font-weight:700;font-family:Consolas,monospace;color:var(--accent);}
+.calc-result-sub{font-size:12.5px;color:var(--text-muted);margin-top:6px;}
+.calc-breakdown{margin-top:14px;font-size:12px;color:var(--text-muted);text-align:left;display:none;}
+.calc-breakdown table{width:100%;border-collapse:collapse;}
+.calc-breakdown td{padding:4px 0;}
+.calc-breakdown tr.total td{border-top:1px solid var(--border);padding-top:8px;font-weight:700;}
+
+/* ── Settings panel ── */
+.sett-backdrop{display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.35);}
+.sett-backdrop.open{display:block;}
+.sett-panel{position:fixed;top:0;right:0;bottom:0;width:360px;
+  background:var(--surface);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:8001;
+  transform:translateX(100%);transition:transform .25s;}
+.sett-backdrop.open .sett-panel{transform:translateX(0);}
+.sett-hdr{padding:15px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;}
+.sett-hdr h3{font-size:14px;font-weight:700;}
+.sett-body{padding:20px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:18px;}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.field input,.field select{width:100%;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:6px;padding:8px 12px;font-size:13px;color:var(--text);
+  font-family:inherit;transition:border-color .2s;}
+.field input:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:1px;}
+.field-note{font-size:11.5px;color:var(--text-muted);margin-top:5px;line-height:1.5;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* ── Toast ── */
+#fcr-toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);
+  opacity:0;z-index:99999;background:var(--surface);border:1px solid var(--border);
+  color:var(--text);font-size:13px;padding:11px 22px;border-radius:10px;
+  pointer-events:none;transition:opacity .2s,transform .2s;white-space:nowrap;}
+#fcr-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#fcr-toast.err{border-color:var(--danger);color:var(--danger);}
+#fcr-toast.ok{border-color:var(--success);color:var(--success);}
+
+/* ── Responsive ── */
+@media(max-width:960px){.cards{grid-template-columns:1fr 1fr}.rankings{grid-template-columns:1fr}.charts-grid{grid-template-columns:1fr}}
+@media(max-width:580px){.cards{grid-template-columns:1fr 1fr}#fcr-main{padding:14px 12px}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header id="fcr-hdr">
+  <a href="FuelVarianceAudit_6.html" class="fcr-logo" title="Back to FVA Dashboard">
+    <img src="fva-logo.png" alt="" onerror="this.style.display='none'">
+    <div><div class="fcr-logo-title">Sky Bridge Logistics</div><div class="fcr-logo-sub">Fuel Consumption Report</div></div>
+  </a>
+  <div class="sep"></div>
+  <button class="btn" id="fcr-calc-btn" title="Calculate required fuel for a planned trip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="13" y2="14"/></svg>
+    Fuel Calculator
+  </button>
+  <label class="btn primary" for="fcr-file" style="cursor:pointer;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 7V3.5L18.5 9H15z"/><polyline points="12 18 12 12"/><polyline points="9 15 12 12 15 15"/></svg>
+    Import Excel
+    <input type="file" id="fcr-file" accept=".xlsx,.xls,.csv" style="display:none;">
+  </label>
+  <button class="btn" id="fcr-sett-btn" title="Consumption constants">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </button>
+  <button class="btn" id="fcr-theme-btn" title="Toggle dark / light mode"></button>
+</header>
+
+<!-- Settings Panel -->
+<div class="sett-backdrop" id="fcr-sett-backdrop">
+  <div class="sett-panel">
+    <div class="sett-hdr">
+      <h3>Consumption Settings</h3>
+      <button class="close-btn" id="fcr-sett-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="sett-body">
+      <div class="field">
+        <label>Standard Consumption Rate (L / 100 km)</label>
+        <input type="number" id="s-rate" value="45" min="1" max="300" step="0.5">
+        <div class="field-note">Typical heavy truck: 40–55 L/100 km loaded. Used to calculate the expected fuel for every trip.</div>
+      </div>
+      <div class="field">
+        <label>Idle Consumption Rate (L / hour)</label>
+        <input type="number" id="s-idle" value="3.5" min="0" max="30" step="0.1">
+        <div class="field-note">Fuel burned at the loading/offloading point while the engine is running but stationary.</div>
+      </div>
+      <div class="field">
+        <label>Default Tank Capacity (L)</label>
+        <input type="number" id="s-tank" value="900" min="50" max="5000" step="50">
+        <div class="field-note">Applied when the imported data does not include a per-row tank size.</div>
+      </div>
+      <div class="field">
+        <label>Distance Type in Excel</label>
+        <select id="s-mult">
+          <option value="2">One-way — multiply × 2 for round trip</option>
+          <option value="1">Already the full round-trip distance</option>
+        </select>
+        <div class="field-note">If your Excel records the one-way distance (loading → offloading), the system doubles it per trip cycle.</div>
+      </div>
+      <button class="btn primary" id="s-save" style="justify-content:center;">Save &amp; Recalculate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fuel Calculator Modal -->
+<div class="modal-backdrop" id="fcr-calc-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>Fuel Requirement Calculator</h3>
+      <button class="close-btn" id="fcr-calc-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;">Enter the trip parameters below to find out how many litres the driver needs to have in the tank before departure.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Loading Point</label>
+          <input type="text" id="c-from" placeholder="e.g. Lobatse Depot">
+        </div>
+        <div class="field">
+          <label>Offloading Point</label>
+          <input type="text" id="c-to" placeholder="e.g. Gaborone Station">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>One-way Distance (km)</label>
+          <input type="number" id="c-dist" placeholder="e.g. 120" min="0">
+        </div>
+        <div class="field">
+          <label>Trips per Load</label>
+          <input type="number" id="c-trips" value="1" min="1" max="20">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Idle Time per Trip (hrs)</label>
+          <input type="number" id="c-idle" value="1" min="0" max="24" step="0.5">
+        </div>
+        <div class="field">
+          <label>Tank Capacity (L)</label>
+          <input type="number" id="c-tank" value="900" min="100">
+        </div>
+      </div>
+      <div class="calc-result" id="fcr-calc-res">
+        <div class="calc-result-val" id="c-val">— L</div>
+        <div class="calc-result-sub" id="c-sub">Enter distance and press Calculate</div>
+        <div class="calc-breakdown" id="c-breakdown"></div>
+      </div>
+      <button class="btn primary" id="c-go" style="justify-content:center;width:100%;margin-top:14px;">Calculate Required Fuel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="fcr-toast"></div>
+
+<!-- Page body -->
+<div id="fcr-main">
+
+  <!-- Empty state -->
+  <div id="fcr-empty">
+    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+    </svg>
+    <h2>No consumption data loaded</h2>
+    <p>Import an Excel (.xlsx) or CSV file to generate the full fleet consumption report. Each row should represent one trip or refuel cycle.</p>
+    <div class="tpl-box">
+      <h4>Expected column headers &nbsp;<span style="color:var(--accent)">★</span> = required</h4>
+      <div class="tpl-cols">
+        <span class="tpl-col">Date</span>
+        <span class="tpl-col">Driver</span>
+        <span class="tpl-col req">Truck Reg ★</span>
+        <span class="tpl-col">Truck Model</span>
+        <span class="tpl-col">Loading Point</span>
+        <span class="tpl-col">Offloading Point</span>
+        <span class="tpl-col req">Distance (km) ★</span>
+        <span class="tpl-col">Last Refuel (L)</span>
+        <span class="tpl-col">Fuel at Departure (L)</span>
+        <span class="tpl-col">Fuel at Arrival (L)</span>
+        <span class="tpl-col">Fuel Used (L)</span>
+        <span class="tpl-col">Idle Time (hrs)</span>
+        <span class="tpl-col">Trips per Load</span>
+        <span class="tpl-col">Tank Capacity (L)</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">Column names are matched case-insensitively. "Fuel Used" can be calculated automatically from Departure − Arrival if not provided directly.</div>
+    </div>
+    <label class="btn primary" for="fcr-file" style="cursor:pointer;font-size:14px;padding:11px 22px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 7V3.5L18.5 9H15z"/><polyline points="12 18 12 12"/><polyline points="9 15 12 12 15 15"/></svg>
+      Import Excel / CSV
+    </label>
+  </div>
+
+  <!-- Content -->
+  <div id="fcr-content">
+
+    <!-- Summary cards -->
+    <div>
+      <div class="sec-hdr">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Fleet Overview
+      </div>
+      <div class="cards" id="fcr-cards"></div>
+    </div>
+
+    <!-- Rankings -->
+    <div>
+      <div class="sec-hdr">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/></svg>
+        Rankings — Driver · Vehicle · Route
+      </div>
+      <div class="rankings" id="fcr-rankings"></div>
+    </div>
+
+    <!-- Charts -->
+    <div>
+      <div class="sec-hdr">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Consumption Charts
+      </div>
+      <div class="charts-grid" id="fcr-charts"></div>
+    </div>
+
+    <!-- Trip table -->
+    <div>
+      <div class="sec-hdr">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        Trip Detail
+      </div>
+      <div class="tbl-wrap">
+        <div class="tbl-toolbar">
+          <input type="search" id="fcr-search" placeholder="Search driver, truck, route…">
+          <span id="fcr-count" style="font-size:12px;color:var(--text-muted);white-space:nowrap;"></span>
+          <button class="btn" id="fcr-export">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+        </div>
+        <div class="tbl-outer">
+          <table class="fcr-tbl">
+            <thead id="fcr-thead"></thead>
+            <tbody id="fcr-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   Fuel Consumption Report — Sky Bridge Logistics
+   ══════════════════════════════════════════════════════ */
+
+/* ── State ── */
+var S = {
+  raw:      [],
+  records:  [],
+  filtered: [],
+  sort: { col: 'date', dir: -1 },
+  cfg: { rate: 45, idleRate: 3.5, tank: 900, mult: 2 }
+};
+
+/* ── Utility ── */
+function fN(v, d) { return (v == null || isNaN(v)) ? '—' : Number(v).toFixed(d == null ? 0 : d); }
+function esc(s)   { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+var _tt; function toast(m,t){ var e=document.getElementById('fcr-toast'); e.textContent=m; e.className='show'+(t?' '+t:''); clearTimeout(_tt); _tt=setTimeout(function(){e.className='';},3500); }
+
+/* ── Theme (shared with main FVA app via fva:theme key) ── */
+function themeIcon() {
+  var L = document.documentElement.getAttribute('data-theme') === 'light';
+  return L
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>';
+}
+(function(){
+  try { if (localStorage.getItem('fva:theme') === 'light') document.documentElement.setAttribute('data-theme','light'); } catch(e){}
+  document.getElementById('fcr-theme-btn').innerHTML = themeIcon();
+})();
+document.getElementById('fcr-theme-btn').onclick = function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  cur === 'light' ? document.documentElement.removeAttribute('data-theme') : document.documentElement.setAttribute('data-theme','light');
+  try { localStorage.setItem('fva:theme', cur === 'light' ? 'dark' : 'light'); } catch(e){}
+  document.getElementById('fcr-theme-btn').innerHTML = themeIcon();
+  if (S.records.length) renderCharts();
+};
+
+/* ── Settings ── */
+function loadCfg() {
+  try { var c=JSON.parse(localStorage.getItem('fcr:cfg')||'{}'); if(c.rate) S.cfg.rate=+c.rate; if(c.idleRate) S.cfg.idleRate=+c.idleRate; if(c.tank) S.cfg.tank=+c.tank; if(c.mult) S.cfg.mult=+c.mult; } catch(e){}
+  document.getElementById('s-rate').value  = S.cfg.rate;
+  document.getElementById('s-idle').value  = S.cfg.idleRate;
+  document.getElementById('s-tank').value  = S.cfg.tank;
+  document.getElementById('s-mult').value  = String(S.cfg.mult);
+  document.getElementById('c-tank').value  = S.cfg.tank;
+}
+document.getElementById('fcr-sett-btn').onclick = function(){ document.getElementById('fcr-sett-backdrop').classList.add('open'); };
+document.getElementById('fcr-sett-close').onclick = function(){ document.getElementById('fcr-sett-backdrop').classList.remove('open'); };
+document.getElementById('fcr-sett-backdrop').onclick = function(e){ if(e.target===this) this.classList.remove('open'); };
+document.getElementById('s-save').onclick = function(){
+  S.cfg.rate    = parseFloat(document.getElementById('s-rate').value) || 45;
+  S.cfg.idleRate= parseFloat(document.getElementById('s-idle').value) || 3.5;
+  S.cfg.tank    = parseFloat(document.getElementById('s-tank').value) || 900;
+  S.cfg.mult    = parseFloat(document.getElementById('s-mult').value) || 2;
+  try { localStorage.setItem('fcr:cfg', JSON.stringify(S.cfg)); } catch(e){}
+  document.getElementById('c-tank').value = S.cfg.tank;
+  document.getElementById('fcr-sett-backdrop').classList.remove('open');
+  if (S.raw.length) { S.records = S.raw.map(enrich); render(); }
+  toast('Settings saved and report recalculated.', 'ok');
+};
+
+/* ── Calculator Modal ── */
+document.getElementById('fcr-calc-btn').onclick = function(){ document.getElementById('fcr-calc-modal').classList.add('open'); };
+document.getElementById('fcr-calc-close').onclick = function(){ document.getElementById('fcr-calc-modal').classList.remove('open'); };
+document.getElementById('fcr-calc-modal').onclick = function(e){ if(e.target===this) this.classList.remove('open'); };
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ document.getElementById('fcr-calc-modal').classList.remove('open'); document.getElementById('fcr-sett-backdrop').classList.remove('open'); }});
+
+document.getElementById('c-go').onclick = function(){
+  var dist  = parseFloat(document.getElementById('c-dist').value)  || 0;
+  var trips = parseInt(document.getElementById('c-trips').value)    || 1;
+  var idle  = parseFloat(document.getElementById('c-idle').value)  || 0;
+  var tank  = parseFloat(document.getElementById('c-tank').value)  || S.cfg.tank;
+  var from  = document.getElementById('c-from').value.trim();
+  var to    = document.getElementById('c-to').value.trim();
+  var rate  = S.cfg.rate;
+  var ir    = S.cfg.idleRate;
+
+  if (!dist) { toast('Enter a distance to calculate.', 'err'); return; }
+
+  var totalDist = dist * 2 * trips;                  // round-trip × trips
+  var driveFuel = (totalDist / 100) * rate;
+  var idleFuel  = idle * ir * trips;
+  var required  = driveFuel + idleFuel;
+  var pct       = (required / tank * 100).toFixed(1);
+  var ok        = required <= tank;
+
+  var vEl = document.getElementById('c-val');
+  var sEl = document.getElementById('c-sub');
+  var bEl = document.getElementById('c-breakdown');
+
+  vEl.textContent = required.toFixed(0) + ' L';
+  vEl.style.color = ok ? 'var(--success)' : 'var(--danger)';
+  sEl.textContent = ok
+    ? pct + '% of ' + tank + ' L tank — adequate for departure ✓'
+    : pct + '% of ' + tank + ' L tank — tank capacity INSUFFICIENT ✗';
+  sEl.style.color = ok ? 'var(--success)' : 'var(--danger)';
+
+  bEl.style.display = 'block';
+  var route = (from && to) ? (from + ' → ' + to + ' (×' + trips + (trips>1?' trips':' trip') + ')') : ('Distance: ' + totalDist + ' km');
+  bEl.innerHTML =
+    '<table><tr><td style="color:var(--text-muted)">Route</td><td style="text-align:right;padding-left:12px;">'+esc(route)+'</td></tr>' +
+    '<tr><td style="color:var(--text-muted)">Total distance</td><td style="text-align:right;padding-left:12px;font-family:Consolas,monospace;">'+totalDist+' km</td></tr>' +
+    '<tr><td style="color:var(--text-muted)">Driving fuel</td><td style="text-align:right;padding-left:12px;font-family:Consolas,monospace;">'+driveFuel.toFixed(0)+' L <span style="color:var(--text-muted);font-size:10.5px;">('+totalDist+' km × '+rate+' L/100km)</span></td></tr>' +
+    '<tr><td style="color:var(--text-muted)">Idle fuel</td><td style="text-align:right;padding-left:12px;font-family:Consolas,monospace;">'+idleFuel.toFixed(1)+' L <span style="color:var(--text-muted);font-size:10.5px;">('+idle+' hrs × '+trips+' trip'+(trips>1?'s':'')+' × '+ir+' L/hr)</span></td></tr>' +
+    '<tr class="total"><td>Required in tank</td><td style="text-align:right;padding-left:12px;font-family:Consolas,monospace;color:'+(ok?'var(--success)':'var(--danger)')+'">'+required.toFixed(0)+' L</td></tr></table>';
+};
+
+/* ── Column header mapping (case-insensitive) ── */
+var ALIASES = {
+  date:            ['date','trip date','travel date','trip_date'],
+  driver:          ['driver','driver name','driver_name','operator','chauffeur'],
+  truckReg:        ['truck','truck reg','truck_reg','vehicle','vehicle reg','registration','reg no','reg'],
+  truckModel:      ['model','truck model','truck_model','vehicle model','make','make & model','vehicle make'],
+  loadingPoint:    ['loading','loading point','from','origin','depot','load point','source'],
+  offloadingPoint: ['offloading','offloading point','to','destination','delivery','delivery point','drop off','drop-off'],
+  distance:        ['distance','distance (km)','dist','km','route km','kms','distance km'],
+  lastRefuel:      ['last refuel','refuel','refuel (l)','last refuel (l)','refuel amount','fuel added','diesel added'],
+  fuelDeparture:   ['fuel at departure','departure fuel','fuel departure','fuel out','start fuel','fuel start','opening fuel'],
+  fuelArrival:     ['fuel at arrival','arrival fuel','fuel arrival','fuel in','end fuel','fuel end','closing fuel','remaining fuel'],
+  fuelUsed:        ['fuel used','fuel consumed','consumption','diesel used','diesel consumed','fuel (used)','litres used'],
+  idleTime:        ['idle','idle time','idle time (hrs)','idle hours','idle (hrs)','idle (h)','idle time (h)','idle hrs'],
+  tripsPerLoad:    ['trips','trips per load','num trips','number of trips','loads','trip count','trips per day'],
+  tankCapacity:    ['tank','tank capacity','tank size','tank (l)','capacity','capacity (l)'],
+};
+function mapHeaders(hdrs) {
+  var m = {};
+  hdrs.forEach(function(h, i){
+    var k = (h||'').toString().toLowerCase().trim().replace(/[_\-]/g,' ');
+    Object.keys(ALIASES).forEach(function(field){
+      if (m[field] != null) return;
+      if (ALIASES[field].indexOf(k) !== -1) m[field] = i;
+    });
+  });
+  return m;
+}
+
+/* ── Excel import ── */
+document.getElementById('fcr-file').addEventListener('change', function(e){
+  var file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+
+  if (typeof XLSX === 'undefined') {
+    toast('SheetJS library not loaded — check your internet connection.', 'err');
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      var wb   = XLSX.read(ev.target.result, { type:'array', cellDates:true });
+      var ws   = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+      if (!rows.length) { toast('File is empty.', 'err'); return; }
+
+      var headers = rows[0].map(function(h){ return (h||'').toString(); });
+      var map     = mapHeaders(headers);
+
+      if (map.distance == null && map.truckReg == null) {
+        toast('Could not find required columns (Truck Reg or Distance). Check your column headers.', 'err');
+        return;
+      }
+
+      var parsed = [];
+      for (var i = 1; i < rows.length; i++) {
+        var row = rows[i];
+        if (row.every(function(c){ return c==='' || c==null; })) continue;
+
+        function g(field){ return map[field]!=null ? row[map[field]] : null; }
+
+        var fd = parseFloat(g('fuelDeparture'))   || 0;
+        var fa = parseFloat(g('fuelArrival'))     || 0;
+        var fu = parseFloat(g('fuelUsed'))        || 0;
+        var fuelUsed = fu > 0 ? fu : (fd > 0 && fd > fa ? fd - fa : null);
+
+        var dateRaw = g('date');
+        var dateStr = '';
+        if (dateRaw instanceof Date) dateStr = dateRaw.toISOString().slice(0,10);
+        else if (dateRaw) dateStr = String(dateRaw).trim();
+
+        var tankVal = parseFloat(g('tankCapacity')) || S.cfg.tank;
+
+        parsed.push({
+          date:            dateStr,
+          driver:          (g('driver') || 'Unknown').toString().trim(),
+          truckReg:        (g('truckReg') || '—').toString().trim(),
+          truckModel:      (g('truckModel') || '—').toString().trim(),
+          loadingPoint:    (g('loadingPoint') || '—').toString().trim(),
+          offloadingPoint: (g('offloadingPoint') || '—').toString().trim(),
+          distance:        Math.max(0, parseFloat(g('distance')) || 0),
+          lastRefuel:      Math.max(0, parseFloat(g('lastRefuel')) || 0),
+          fuelDeparture:   fd,
+          fuelArrival:     fa,
+          fuelUsed:        fuelUsed,
+          idleTime:        Math.max(0, parseFloat(g('idleTime')) || 0),
+          tripsPerLoad:    Math.max(1, parseInt(g('tripsPerLoad')) || 1),
+          tankCapacity:    tankVal,
+        });
+      }
+
+      if (!parsed.length) { toast('No data rows found after the header.', 'err'); return; }
+
+      S.raw     = parsed;
+      S.records = parsed.map(enrich);
+      toast('Imported ' + parsed.length + ' trips from ' + esc(file.name), 'ok');
+      render();
+
+    } catch(err) {
+      toast('Error reading file: ' + err.message, 'err');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+/* ── Enrich (calculate derived fields) ── */
+function enrich(r) {
+  var totalDist    = r.distance * S.cfg.mult * r.tripsPerLoad;
+  var expectedFuel = (totalDist / 100) * S.cfg.rate + r.idleTime * S.cfg.idleRate * r.tripsPerLoad;
+  var actualRate   = (r.fuelUsed != null && totalDist > 0) ? (r.fuelUsed / totalDist * 100) : null;
+  var variance     = r.fuelUsed != null ? r.fuelUsed - expectedFuel : null;
+  var adequate     = r.fuelDeparture > 0 ? r.fuelDeparture >= expectedFuel : null;
+  return Object.assign({}, r, {
+    totalDist:    totalDist,
+    expectedFuel: expectedFuel,
+    actualRate:   actualRate,
+    variance:     variance,
+    adequate:     adequate,
+    route:        r.loadingPoint + ' → ' + r.offloadingPoint,
+  });
+}
+
+/* ── Aggregate by key ── */
+function agg(records, keyFn) {
+  var m = {};
+  records.forEach(function(r){
+    var k = (keyFn(r)||'Unknown').trim();
+    if (!m[k]) m[k] = { key:k, trips:0, totalDist:0, totalUsed:0, n:0 };
+    m[k].trips++;
+    m[k].totalDist += r.totalDist || 0;
+    if (r.fuelUsed != null) { m[k].totalUsed += r.fuelUsed; m[k].n++; }
+  });
+  return Object.values(m)
+    .map(function(a){ return Object.assign(a, { avgRate: a.n>0 && a.totalDist>0 ? a.totalUsed/a.totalDist*100 : null }); })
+    .filter(function(a){ return a.avgRate != null; })
+    .sort(function(a,b){ return b.avgRate - a.avgRate; }); /* worst first */
+}
+
+/* ════ RENDER ════ */
+function render() {
+  document.getElementById('fcr-empty').style.display   = 'none';
+  document.getElementById('fcr-content').classList.add('visible');
+  renderCards();
+  renderRankings();
+  renderCharts();
+  renderTable();
+}
+
+/* ── Cards ── */
+function renderCards() {
+  var R = S.records;
+  var w = R.filter(function(r){ return r.fuelUsed != null; });
+  var tF = w.reduce(function(s,r){ return s+r.fuelUsed; }, 0);
+  var tD = R.reduce(function(s,r){ return s+(r.totalDist||0); }, 0);
+  var avgR = tD>0 && w.length ? tF/tD*100 : null;
+  var over = w.filter(function(r){ return r.variance>0; }).length;
+  var drvs = new Set(R.map(function(r){ return r.driver; })).size;
+  var trks = new Set(R.map(function(r){ return r.truckReg; })).size;
+  var std  = S.cfg.rate;
+
+  document.getElementById('fcr-cards').innerHTML =
+    _card('Total Fuel Used',    fN(tF,0)+' L',           w.length+' trips with recorded usage',                                   null) +
+    _card('Total Distance',     fN(tD,0)+' km',          R.length+' trips · '+trks+' trucks · '+drvs+' drivers',                  null) +
+    _card('Fleet Avg Rate',     avgR!=null?fN(avgR,1)+' L/100km':'No fuel data', avgR?'Standard: '+std+' L/100km — '+(avgR>std?'OVER target':'within target'):'Record fuel data to calculate', avgR?(avgR>std?'bad':'good'):null) +
+    _card('Over-Budget Trips',  over+' / '+w.length,     over>0?'Trips where actual fuel exceeded expected':'All trips within expected range', over>0&&over>w.length*0.25?'bad':'good');
+}
+function _card(lbl,val,sub,cls){
+  return '<div class="card"><div class="card-label">'+esc(lbl)+'</div>'+
+    '<div class="card-val'+(cls?' '+cls:'')+'">'+esc(val)+'</div>'+
+    '<div class="card-sub">'+esc(sub)+'</div></div>';
+}
+
+/* ── Rankings ── */
+function renderRankings() {
+  var R = S.records;
+  var drv = agg(R, function(r){ return r.driver; });
+  var trk = agg(R, function(r){ return r.truckReg+(r.truckModel!=='—'?' ('+r.truckModel+')':''); });
+  var rte = agg(R, function(r){ return r.route; });
+
+  var svgPerson = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+  var svgTruck  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h5l3 5v3h-8V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>';
+  var svgRoute  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0"><path d="M3 12h18M3 12l4-4m-4 4 4 4"/></svg>';
+
+  document.getElementById('fcr-rankings').innerHTML =
+    _rankCard('Drivers', svgPerson, drv) +
+    _rankCard('Vehicles', svgTruck, trk) +
+    _rankCard('Routes', svgRoute, rte);
+}
+function _rankCard(title, icon, items) {
+  var worst = items.slice(0, 3);
+  var best  = items.slice(-3).reverse();
+  function rows(list, cls) {
+    if (!list.length) return '<div style="padding:6px 0;font-size:12px;color:var(--text-muted)">No data available</div>';
+    return list.map(function(a,i){
+      return '<div class="rank-row">'+
+        '<div class="rank-pos '+cls+'">'+(i+1)+'</div>'+
+        '<div><div class="rank-name" title="'+esc(a.key)+'">'+esc(a.key)+'</div>'+
+        '<div class="rank-meta">'+a.trips+' trip'+(a.trips>1?'s':'')+' · '+fN(a.totalDist,0)+' km</div></div>'+
+        '<div class="rank-val '+cls+'">'+fN(a.avgRate,1)+' L/100km</div>'+
+        '</div>';
+    }).join('');
+  }
+  return '<div class="rank-card">'+
+    '<div class="rank-hdr">'+icon+'&nbsp;'+esc(title)+'</div>'+
+    '<div class="rank-list">'+
+      '<div class="rank-divider" style="color:var(--danger)"><span></span>Worst consumption<span></span></div>'+
+      rows(worst,'bad')+
+      '<div class="rank-divider" style="color:var(--success);margin-top:4px;"><span></span>Best consumption<span></span></div>'+
+      rows(best,'good')+
+    '</div></div>';
+}
+
+/* ── Charts ── */
+function renderCharts() {
+  var R = S.records;
+  var drv = agg(R, function(r){ return r.driver; });
+  var trk = agg(R, function(r){ return r.truckReg+(r.truckModel!=='—'?' ('+r.truckModel+')':''); });
+
+  document.getElementById('fcr-charts').innerHTML =
+    '<div class="chart-card"><div class="sec-hdr" style="font-size:12px;margin-bottom:10px;"><span>Driver Consumption (L/100 km) — worst → best</span></div><canvas id="c-drv"></canvas></div>'+
+    '<div class="chart-card"><div class="sec-hdr" style="font-size:12px;margin-bottom:10px;"><span>Vehicle Consumption (L/100 km) — worst → best</span></div><canvas id="c-trk"></canvas></div>';
+
+  setTimeout(function(){
+    drawBars('c-drv', drv.slice(0, 15));
+    drawBars('c-trk', trk.slice(0, 15));
+  }, 60);
+}
+
+function drawBars(id, items) {
+  var cv = document.getElementById(id);
+  if (!cv || !items.length) return;
+
+  var LIGHT  = document.documentElement.getAttribute('data-theme') === 'light';
+  var PAD_L  = 155, PAD_R = 90, PAD_V = 16, ROW_H = 34;
+  var W      = cv.parentElement.clientWidth - 32;
+  var H      = items.length * ROW_H + PAD_V * 2;
+  var DPR    = window.devicePixelRatio || 1;
+  cv.width   = W * DPR; cv.height = H * DPR;
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+
+  var ctx = cv.getContext('2d');
+  ctx.scale(DPR, DPR);
+
+  var std    = S.cfg.rate;
+  var maxR   = Math.max.apply(null, items.map(function(a){ return a.avgRate; })) || 1;
+  var chartW = W - PAD_L - PAD_R;
+  var tCol   = LIGHT ? '#1a2535' : '#e7ebf0';
+  var mCol   = LIGHT ? '#556070' : '#8b96a5';
+
+  items.forEach(function(a, i) {
+    var y    = PAD_V + i * ROW_H + ROW_H / 2;
+    var pct  = a.avgRate / maxR;
+    var bw   = pct * chartW;
+    var over = a.avgRate > std;
+    var gc   = over ? (LIGHT ? '#dc2626' : '#ef5350') : (LIGHT ? '#16a34a' : '#5fd3a3');
+
+    /* Bar background track */
+    ctx.fillStyle = LIGHT ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.04)';
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(PAD_L, y-10, chartW, 20, 4) : ctx.rect(PAD_L, y-10, chartW, 20);
+    ctx.fill();
+    /* Bar fill */
+    var grad = ctx.createLinearGradient(PAD_L, 0, PAD_L+bw, 0);
+    grad.addColorStop(0, gc + (LIGHT ? '33' : '22'));
+    grad.addColorStop(1, gc);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(PAD_L, y-10, Math.max(bw, 3), 20, [4,2,2,4]) : ctx.rect(PAD_L, y-10, Math.max(bw, 3), 20);
+    ctx.fill();
+
+    /* Name label */
+    ctx.fillStyle = tCol;
+    ctx.font = '11.5px Segoe UI, system-ui, sans-serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(a.key.length > 21 ? a.key.slice(0,20)+'…' : a.key, PAD_L - 8, y);
+
+    /* Value label */
+    ctx.fillStyle = gc;
+    ctx.font = 'bold 11.5px Consolas, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(fN(a.avgRate,1)+' L', PAD_L + bw + 7, y);
+
+    /* Trip count */
+    ctx.fillStyle = mCol;
+    ctx.font = '10px Segoe UI, system-ui, sans-serif';
+    ctx.fillText(a.trips+'t', W - PAD_R + 4, y);
+  });
+
+  /* Standard rate marker */
+  if (std > 0 && maxR > 0) {
+    var sx = PAD_L + (std / maxR) * chartW;
+    ctx.strokeStyle = LIGHT ? 'rgba(196,127,8,.7)' : 'rgba(245,185,66,.55)';
+    ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(sx, PAD_V - 10); ctx.lineTo(sx, H - PAD_V + 6); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = LIGHT ? '#c47f08' : '#f5b942';
+    ctx.font = 'bold 10px Segoe UI, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Std '+std, sx, PAD_V - 3);
+  }
+}
+
+/* ── Table ── */
+var COLS = [
+  { k:'date',          h:'Date',            a:'',      f:function(r){ return esc(r.date||'—'); }},
+  { k:'driver',        h:'Driver',          a:'',      f:function(r){ return esc(r.driver); }},
+  { k:'truckReg',      h:'Truck Reg',       a:'',      f:function(r){ return esc(r.truckReg); }},
+  { k:'truckModel',    h:'Model',           a:'',      f:function(r){ return esc(r.truckModel); }},
+  { k:'route',         h:'Route',           a:'',      f:function(r){ return esc(r.route); }},
+  { k:'distance',      h:'Dist (km)',       a:'right', f:function(r){ return fN(r.distance,0); }},
+  { k:'tripsPerLoad',  h:'Trips',           a:'right', f:function(r){ return r.tripsPerLoad; }},
+  { k:'lastRefuel',    h:'Last Refuel (L)', a:'right', f:function(r){ return r.lastRefuel>0?fN(r.lastRefuel,0):'—'; }},
+  { k:'fuelDeparture', h:'Fuel Out (L)',    a:'right', f:function(r){ return r.fuelDeparture>0?fN(r.fuelDeparture,0):'—'; }},
+  { k:'fuelArrival',   h:'Fuel In (L)',     a:'right', f:function(r){ return r.fuelArrival>0?fN(r.fuelArrival,0):'—'; }},
+  { k:'fuelUsed',      h:'Used (L)',        a:'right', f:function(r){ return r.fuelUsed!=null?'<strong>'+fN(r.fuelUsed,0)+'</strong>':'—'; }},
+  { k:'expectedFuel',  h:'Expected (L)',    a:'right', f:function(r){ return fN(r.expectedFuel,0); }},
+  { k:'variance',      h:'Variance (L)',    a:'right', f:function(r){
+      if (r.variance==null) return '—';
+      var c=r.variance>0?'var(--danger)':'var(--success)';
+      return '<span style="color:'+c+';font-weight:700;">'+(r.variance>0?'+':'')+fN(r.variance,0)+'</span>';
+  }},
+  { k:'actualRate',    h:'L/100km',         a:'right', f:function(r){
+      if (r.actualRate==null) return '—';
+      var over=r.actualRate>S.cfg.rate;
+      return '<span style="color:'+(over?'var(--danger)':'var(--success)')+';font-weight:700;">'+fN(r.actualRate,1)+'</span>';
+  }},
+  { k:'adequate',      h:'Fuel OK?',        a:'center',f:function(r){
+      if (r.adequate===null) return '<span class="badge nodata">—</span>';
+      return r.adequate?'<span class="badge ok">✓ OK</span>':'<span class="badge under">⚠ Under</span>';
+  }},
+  { k:'idleTime',      h:'Idle (hrs)',      a:'right', f:function(r){ return r.idleTime>0?fN(r.idleTime,1):'—'; }},
+];
+
+function renderTable() {
+  var thead = document.getElementById('fcr-thead');
+  thead.innerHTML = '<tr>'+COLS.map(function(c){
+    var a = S.sort.col===c.k;
+    return '<th class="'+(a?'active':'')+'" data-k="'+c.k+'">'+c.h+(a?(S.sort.dir===1?' ▲':' ▼'):'')+'</th>';
+  }).join('')+'</tr>';
+  thead.querySelectorAll('th').forEach(function(th){
+    th.onclick = function(){
+      var k = th.getAttribute('data-k');
+      if (S.sort.col===k) S.sort.dir*=-1; else { S.sort.col=k; S.sort.dir=-1; }
+      renderBody();
+    };
+  });
+  renderBody();
+}
+
+function renderBody() {
+  var q  = (document.getElementById('fcr-search').value||'').toLowerCase();
+  var d  = S.sort.dir, k = S.sort.col;
+  var rs = S.records.filter(function(r){
+    if (!q) return true;
+    return (r.driver+r.truckReg+r.truckModel+r.route+r.date).toLowerCase().indexOf(q)!==-1;
+  }).slice().sort(function(a,b){
+    var va=a[k], vb=b[k];
+    if (va==null) return 1; if (vb==null) return -1;
+    return typeof va==='string' ? d*va.localeCompare(vb) : d*(va-vb);
+  });
+  S.filtered = rs;
+  document.getElementById('fcr-count').textContent = rs.length+' of '+S.records.length+' trips';
+  document.getElementById('fcr-tbody').innerHTML = rs.length===0
+    ? '<tr><td colspan="'+COLS.length+'" style="text-align:center;padding:32px;color:var(--text-muted);">No trips match the search.</td></tr>'
+    : rs.map(function(r){
+        return '<tr>'+COLS.map(function(c){
+          return '<td'+(c.a?' style="text-align:'+c.a+'"':'')+'>'+c.f(r)+'</td>';
+        }).join('')+'</tr>';
+      }).join('');
+  /* Refresh header sort indicators */
+  document.getElementById('fcr-thead').querySelectorAll('th').forEach(function(th){
+    var ck = th.getAttribute('data-k');
+    th.className = ck===S.sort.col?'active':'';
+    th.textContent = COLS.find(function(c){ return c.k===ck; }).h + (ck===S.sort.col?(S.sort.dir===1?' ▲':' ▼'):'');
+    th.setAttribute('data-k', ck);
+    th.onclick = function(){
+      if (S.sort.col===ck) S.sort.dir*=-1; else { S.sort.col=ck; S.sort.dir=-1; }
+      renderBody();
+    };
+  });
+}
+
+document.getElementById('fcr-search').addEventListener('input', renderBody);
+
+/* ── Export CSV ── */
+document.getElementById('fcr-export').onclick = function(){
+  if (!S.filtered.length) { toast('No data to export.'); return; }
+  var hdrs = COLS.map(function(c){ return '"'+c.h+'"'; }).join(',');
+  var body = S.filtered.map(function(r){
+    return [
+      r.date, r.driver, r.truckReg, r.truckModel, r.route,
+      r.distance, r.tripsPerLoad, r.lastRefuel||'', r.fuelDeparture||'', r.fuelArrival||'',
+      r.fuelUsed!=null?r.fuelUsed.toFixed(1):'',
+      r.expectedFuel.toFixed(1),
+      r.variance!=null?r.variance.toFixed(1):'',
+      r.actualRate!=null?r.actualRate.toFixed(2):'',
+      r.adequate===null?'':(r.adequate?'OK':'Under'),
+      r.idleTime||0,
+    ].map(function(v){ return '"'+(v==null?'':v).toString().replace(/"/g,'""')+'"'; }).join(',');
+  }).join('\n');
+  var blob = new Blob([hdrs+'\n'+body], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fuel-consumption-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('CSV exported.', 'ok');
+};
+
+/* ── Init ── */
+window.addEventListener('DOMContentLoaded', loadCfg);
+</script>
+</body>
+</html>
