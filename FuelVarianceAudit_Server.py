@@ -91,12 +91,29 @@ def _consume_otp(mfa_token: str, code: str):
         _otp_store.pop(mfa_token, None)
         return entry["username"]
 
+def _load_smtp_creds() -> tuple[str, str]:
+    user = os.getenv("FVA_SMTP_USER", "")
+    pw   = os.getenv("FVA_SMTP_PASS", "")
+    if user and pw:
+        return user, pw
+    cfg = os.path.join(BASE_DIR, ".fva_smtp")
+    if os.path.exists(cfg):
+        vals: dict = {}
+        with open(cfg, encoding="utf-8") as _f:
+            for line in _f:
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    k, _, v = line.partition("=")
+                    vals[k.strip()] = v.strip()
+        user = vals.get("user", "")
+        pw   = vals.get("pass", "")
+    return user, pw
+
 def _send_otp_email(to_email: str, name: str, code: str) -> None:
-    smtp_user = os.getenv("FVA_SMTP_USER", "")
-    smtp_pass = os.getenv("FVA_SMTP_PASS", "")
+    smtp_user, smtp_pass = _load_smtp_creds()
     if not smtp_user or not smtp_pass:
         raise RuntimeError(
-            "Email not configured — set FVA_SMTP_USER and FVA_SMTP_PASS environment variables."
+            "Email not configured — set FVA_SMTP_USER and FVA_SMTP_PASS, or create .fva_smtp."
         )
     mins = OTP_TTL // 60
     msg            = MIMEMultipart("alternative")

@@ -1,5 +1,6 @@
 # ── Secrets & credentials ──────────────────────────────
 .fva_secret
+.fva_smtp
 .fva_zoho_config
 self_client.json
 self_client (1).json
