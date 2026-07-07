@@ -362,15 +362,15 @@
         <p class="no-acct">Don't have an account? <a href="#">Contact Admin</a></p>
       </div>
 
-      <!-- STEP 2: Phone 2FA -->
+      <!-- STEP 2: Email 2FA -->
       <div class="step" id="step-2">
         <button class="back-link" onclick="goBack()">
           <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
           Back
         </button>
-        <h1>Phone Verification</h1>
-        <p class="subtitle">Enter the 6-digit code sent to your phone.</p>
-        <div id="info-phone" class="info-box"></div>
+        <h1>Email Verification</h1>
+        <p class="subtitle">Enter the 6-digit code sent to your Outlook email.</p>
+        <div id="info-email" class="info-box"></div>
         <div id="alert-2" class="alert error"></div>
         <div class="otp-row">
           <input type="text" maxlength="1" class="otp-input" inputmode="numeric" pattern="[0-9]*" />
@@ -382,9 +382,9 @@
         </div>
         <div class="resend-row">
           Didn't receive a code?
-          <button id="resend-btn" onclick="resendSMSOTP()" disabled>Resend in <span id="countdown">60</span>s</button>
+          <button id="resend-btn" onclick="resendEmailOTP()" disabled>Resend in <span id="countdown">60</span>s</button>
         </div>
-        <button class="btn" id="verify-btn" onclick="verifyPhoneOTP()">Verify &amp; Sign In</button>
+        <button class="btn" id="verify-btn" onclick="verifyEmailOTP()">Verify &amp; Sign In</button>
       </div>
 
       <!-- STEP 3: Success -->
@@ -412,18 +412,15 @@
     sum.innerHTML = (open ? '&#9658;' : '&#9660;') + ' Admin credentials (quick access)';
   }
 
-  /* EmailJS retained for possible future use */
-  var EMAILJS_PUBLIC_KEY  = 'vfhhXCc1B-W9qEH0z';
-  if (typeof emailjs !== 'undefined') emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
-
   /* SSO client IDs */
   var AZURE_CLIENT_ID = 'YOUR_AZURE_CLIENT_ID';
   var ZOHO_CLIENT_ID  = 'YOUR_ZOHO_CLIENT_ID';
 
   /* State */
-  var generatedOTP   = '';
-  var countdownTimer = null;
-  var pwdVisible     = false;
+  var pendingMfaToken = '';
+  var pendingUser     = null;
+  var countdownTimer  = null;
+  var pwdVisible      = false;
 
   /* Helpers */
   function showStep(n) {
@@ -450,8 +447,6 @@
       : '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
   }
 
-  function generateOTP() { return Math.floor(100000 + Math.random() * 900000).toString(); }
-
   function startCountdown() {
     var secs = 60;
     var btn = document.getElementById('resend-btn');
@@ -464,44 +459,20 @@
     }, 1000);
   }
 
-  /* djb2-XOR hash */
-  function _fvaH(s) {
-    var h = 5381;
-    for (var i = 0; i < s.length; i++) h = (((h << 5) + h) ^ s.charCodeAt(i)) >>> 0;
-    return h.toString(36);
-  }
-
-  /* Valid users — update phone numbers with real E.164 values e.g. +26771234567 */
-  var VALID_USERS = [
-    { username: 'a.olatotse',     pwh: _fvaH('FuelAudit@2026!'), email: 'aaolatotse1@gmail.com',                        name: 'Aobakwe Olatotse',    role: 'admin',    phone: '+26776733163' },
-    { username: 'p.gaotlhobogwe', pwh: _fvaH('FuelAudit@2026!'), email: 'prince.gaotlhobogwe@skybridgelogistics.co.bw', name: 'Prince Gaotlhobogwe', role: 'admin',    phone: '+26772345678' },
-    { username: 'g.mogorosi',     pwh: _fvaH('FuelAudit@2026!'), email: 'goitse.mogorosi@skybridgelogistics.co.bw',      name: 'Goitse Mogorosi',     role: 'dispatch', phone: '+26773456789' }
-  ];
-
-  /* Phone 2FA state */
-  var pendingPhone = '';
-  var pendingToken = null;
-  var pendingUser  = null;
-
   function fillDemo() {
-    document.getElementById('username').value = VALID_USERS[0].username;
+    document.getElementById('username').value = 'a.olatotse';
     document.getElementById('password').value = 'FuelAudit@2026!';
   }
 
   var FVA_API = localStorage.getItem('fva:api-url') || 'http://localhost:5000';
 
-  /* Step 1 — verify username + password then trigger phone 2FA */
+  /* Step 1 — send credentials to server; server emails OTP */
   async function submitCredentials() {
     clearAlert('alert-1');
     var username = document.getElementById('username').value.trim();
     var password = document.getElementById('password').value;
     if (!username) { showAlert('alert-1', 'Username is required.'); return; }
     if (!password) { showAlert('alert-1', 'Password is required.'); return; }
-
-    var localUser = VALID_USERS.find(function(u){ return u.username === username; });
-    if (!localUser || localUser.pwh !== _fvaH(password)) {
-      showAlert('alert-1', 'Invalid username or password.'); return;
-    }
 
     var btn = document.getElementById('login-btn');
     btn.disabled = true; btn.textContent = 'Verifying…';
@@ -514,38 +485,16 @@
       });
       var data = await res.json();
       if (!res.ok) { showAlert('alert-1', data.error || 'Login failed.'); btn.disabled=false; btn.textContent='Login'; return; }
-      pendingToken = data.token;
-      pendingUser  = data.user;
+
+      pendingMfaToken = data.mfa_token;
+      document.getElementById('info-email').textContent =
+        'A 6-digit code has been sent to ' + (data.email_hint || 'your registered email') + '. Check your inbox.';
     } catch(e) {
-      /* Server offline — fall back to local auth, defer token */
-      pendingToken = null;
-      pendingUser  = { username: localUser.username, name: localUser.name, email: localUser.email, role: localUser.role };
+      showAlert('alert-1', 'Cannot reach the server. Make sure FuelVarianceAudit_Server.py is running.');
+      btn.disabled = false; btn.textContent = 'Login'; return;
     }
 
     btn.disabled = false; btn.textContent = 'Login';
-    pendingPhone = localUser.phone || '';
-    await sendSMSOTP(pendingPhone);
-  }
-
-  /* Step 2 — send SMS OTP via TextBelt (free tier) with demo fallback */
-  async function sendSMSOTP(phone) {
-    generatedOTP = generateOTP();
-    var digits = phone.replace(/\D/g, '');
-    var masked = phone.slice(0, -4).replace(/[0-9]/g, '•') + phone.slice(-4);
-    var infoEl = document.getElementById('info-phone');
-    try {
-      var res = await fetch('https://textbelt.com/text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone, message: 'FVA code: ' + generatedOTP + '. Do not share this.', key: 'textbelt' })
-      });
-      var rd = await res.json();
-      infoEl.textContent = rd.success
-        ? 'Code sent to ' + masked + '. Check your SMS messages.'
-        : 'Demo mode — code for ' + masked + ': ' + generatedOTP;
-    } catch(e) {
-      infoEl.textContent = 'Demo mode — code for ' + masked + ': ' + generatedOTP;
-    }
     showStep(2); setupOTPInputs(); startCountdown();
   }
 
@@ -560,42 +509,62 @@
     inputs[0].focus();
   }
 
-  function verifyPhoneOTP() {
+  async function verifyEmailOTP() {
     clearAlert('alert-2');
     var entered = Array.from(document.querySelectorAll('.otp-input')).map(function(i){ return i.value; }).join('');
     if (entered.length < 6) { showAlert('alert-2', 'Please enter all 6 digits.'); return; }
-    if (entered !== generatedOTP) {
-      showAlert('alert-2', 'Incorrect code. Please try again.');
-      document.querySelectorAll('.otp-input').forEach(function(i){ i.value=''; i.classList.add('err'); });
-      document.querySelector('.otp-input').focus();
-      setTimeout(function(){ document.querySelectorAll('.otp-input').forEach(function(i){ i.classList.remove('err'); }); }, 800);
-      return;
-    }
-    clearInterval(countdownTimer);
-    if (pendingToken) { try { sessionStorage.setItem('fva:auth-token', pendingToken); } catch(e){} }
-    try { sessionStorage.setItem('fva:current-user', JSON.stringify({ username: pendingUser.username, name: pendingUser.name, email: pendingUser.email, role: pendingUser.role })); } catch(e){}
-    showStep(3);
-    setTimeout(function(){ sessionStorage.setItem('fva:from-login','1'); window.location.href = 'FuelVarianceAudit_6.html'; }, 2500);
-  }
 
-  async function resendSMSOTP() {
-    clearAlert('alert-2'); generatedOTP = generateOTP();
-    var infoEl = document.getElementById('info-phone');
-    var masked = pendingPhone.slice(0,-4).replace(/[0-9]/g,'•') + pendingPhone.slice(-4);
+    var vBtn = document.getElementById('verify-btn');
+    vBtn.disabled = true; vBtn.textContent = 'Verifying…';
+
     try {
-      var res = await fetch('https://textbelt.com/text', {
+      var res = await fetch(FVA_API + '/api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: pendingPhone, message: 'FVA code: ' + generatedOTP + '. Do not share this.', key: 'textbelt' })
+        body: JSON.stringify({ mfa_token: pendingMfaToken, code: entered })
       });
-      var rd = await res.json();
-      if (!rd.success) infoEl.textContent = 'Demo mode — new code for ' + masked + ': ' + generatedOTP;
+      var data = await res.json();
+      if (!res.ok) {
+        showAlert('alert-2', data.error || 'Incorrect or expired code. Please try again.');
+        document.querySelectorAll('.otp-input').forEach(function(i){ i.value=''; i.classList.add('err'); });
+        document.querySelector('.otp-input').focus();
+        setTimeout(function(){ document.querySelectorAll('.otp-input').forEach(function(i){ i.classList.remove('err'); }); }, 800);
+        vBtn.disabled = false; vBtn.textContent = 'Verify & Sign In'; return;
+      }
+      clearInterval(countdownTimer);
+      try { sessionStorage.setItem('fva:auth-token', data.token); } catch(e){}
+      try { sessionStorage.setItem('fva:current-user', JSON.stringify(data.user)); } catch(e){}
+      showStep(3);
+      setTimeout(function(){ sessionStorage.setItem('fva:from-login','1'); window.location.href = 'FuelVarianceAudit_6.html'; }, 2500);
     } catch(e) {
-      infoEl.textContent = 'Demo mode — new code for ' + masked + ': ' + generatedOTP;
+      showAlert('alert-2', 'Cannot reach the server. Please try again.');
+      vBtn.disabled = false; vBtn.textContent = 'Verify & Sign In';
     }
-    document.querySelectorAll('.otp-input').forEach(function(i){ i.value=''; });
-    document.querySelector('.otp-input').focus();
-    startCountdown(); showAlert('alert-2', 'A new code has been sent.', 'success');
+  }
+
+  async function resendEmailOTP() {
+    clearAlert('alert-2');
+    var btn = document.getElementById('resend-btn');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      var username = document.getElementById('username').value.trim();
+      var password = document.getElementById('password').value;
+      var res = await fetch(FVA_API + '/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: password })
+      });
+      var data = await res.json();
+      if (!res.ok) { showAlert('alert-2', data.error || 'Could not resend code.'); btn.textContent = 'Resend code'; return; }
+      pendingMfaToken = data.mfa_token;
+      document.querySelectorAll('.otp-input').forEach(function(i){ i.value=''; });
+      document.querySelector('.otp-input').focus();
+      startCountdown();
+      showAlert('alert-2', 'A new code has been sent to your email.', 'success');
+    } catch(e) {
+      showAlert('alert-2', 'Cannot reach the server. Please try again.');
+      btn.disabled = false; btn.textContent = 'Resend code';
+    }
   }
 
   function goBack() { clearInterval(countdownTimer); clearAlert('alert-2'); showStep(1); }
@@ -603,7 +572,7 @@
   document.addEventListener('keydown', function(e) {
     if (e.key !== 'Enter') return;
     if (document.getElementById('step-1').classList.contains('active')) submitCredentials();
-    if (document.getElementById('step-2').classList.contains('active')) verifyPhoneOTP();
+    if (document.getElementById('step-2').classList.contains('active')) verifyEmailOTP();
   });
 
   /* Microsoft SSO */

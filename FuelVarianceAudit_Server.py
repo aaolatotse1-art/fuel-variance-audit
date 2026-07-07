@@ -17,6 +17,13 @@ import sqlite3
 import secrets
 import os
 import re
+import smtplib
+import random
+import string
+import threading
+import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # ── App setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
@@ -41,6 +48,102 @@ else:
     print(f"[FVA] Generated new signing key → {SECRET_FILE}")
 
 BCRYPT_ROUNDS = 12      # ≈ 250 ms on modern hardware — adjust up for slower servers
+
+# ── Email 2FA / OTP ───────────────────────────────────────────────────────────
+# Set these environment variables before starting the server:
+#   FVA_SMTP_USER  — your Outlook/Office365 address  e.g. alerts@yourdomain.com
+#   FVA_SMTP_PASS  — your Outlook app password (not your login password)
+SMTP_HOST = "smtp.office365.com"
+SMTP_PORT = 587
+OTP_TTL   = 600   # seconds (10 minutes)
+
+_otp_store: dict = {}
+_otp_lock = threading.Lock()
+
+def _gen_otp() -> str:
+    return "".join(random.choices(string.digits, k=6))
+
+def _store_otp(username: str):
+    code  = _gen_otp()
+    token = secrets.token_urlsafe(32)
+    exp   = time.time() + OTP_TTL
+    with _otp_lock:
+        # Purge expired entries on each write
+        for k in [k for k, v in list(_otp_store.items()) if v["exp"] < time.time()]:
+            del _otp_store[k]
+        _otp_store[token] = {"otp": code, "username": username, "exp": exp, "used": False}
+    return token, code
+
+def _consume_otp(mfa_token: str, code: str):
+    """Returns username if OTP is valid and unused, None otherwise."""
+    with _otp_lock:
+        entry = _otp_store.get(mfa_token)
+        if not entry:
+            return None
+        if time.time() > entry["exp"]:
+            _otp_store.pop(mfa_token, None)
+            return None
+        if entry["used"]:
+            return None
+        if entry["otp"] != code.strip():
+            return None
+        entry["used"] = True
+        _otp_store.pop(mfa_token, None)
+        return entry["username"]
+
+def _send_otp_email(to_email: str, name: str, code: str) -> None:
+    smtp_user = os.getenv("FVA_SMTP_USER", "")
+    smtp_pass = os.getenv("FVA_SMTP_PASS", "")
+    if not smtp_user or not smtp_pass:
+        raise RuntimeError(
+            "Email not configured — set FVA_SMTP_USER and FVA_SMTP_PASS environment variables."
+        )
+    mins = OTP_TTL // 60
+    msg            = MIMEMultipart("alternative")
+    msg["Subject"] = "Your Fuel Variance Audit sign-in code"
+    msg["From"]    = f"Fuel Variance Audit <{smtp_user}>"
+    msg["To"]      = to_email
+
+    plain = (
+        f"Hello {name},\n\n"
+        f"Your sign-in verification code is: {code}\n\n"
+        f"This code expires in {mins} minutes. Do not share it with anyone.\n\n"
+        f"If you did not request this, contact your administrator immediately.\n\n"
+        f"Sky Bridge Logistics — Fuel Variance Audit"
+    )
+    html = f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif">
+<div style="max-width:480px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+  <div style="background:#0f1923;padding:24px 32px;overflow:hidden">
+    <span style="font-size:17px;font-weight:700;color:#fff">Fuel Variance Audit</span>
+    <span style="font-size:11px;color:#8a9ab5;float:right;line-height:26px">Sky Bridge Logistics</span>
+  </div>
+  <div style="padding:36px 32px">
+    <p style="margin:0 0 8px;font-size:15px;font-weight:600;color:#1a2535">Hello {name},</p>
+    <p style="margin:0 0 28px;font-size:14px;color:#4a5568;line-height:1.6">
+      Use the code below to complete your sign-in.
+      It expires in <strong>{mins} minutes</strong>.
+    </p>
+    <div style="background:#f0f4f8;border-radius:10px;padding:24px;text-align:center;margin-bottom:28px">
+      <div style="font-size:40px;font-weight:800;letter-spacing:14px;color:#0f1923;font-family:Consolas,monospace;padding-left:14px">{code}</div>
+    </div>
+    <p style="margin:0;font-size:12px;color:#8a9ab5;line-height:1.6">
+      If you did not request this code, ignore this email and contact your administrator immediately.
+      Never share this code with anyone.
+    </p>
+  </div>
+  <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px">
+    <p style="margin:0;font-size:11px;color:#a0aec0">Sky Bridge Logistics &nbsp;&middot;&nbsp; Automated notification &nbsp;&middot;&nbsp; Do not reply</p>
+  </div>
+</div>
+</body></html>"""
+    msg.attach(MIMEText(plain, "plain"))
+    msg.attach(MIMEText(html,  "html"))
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as srv:
+        srv.ehlo()
+        srv.starttls()
+        srv.login(smtp_user, smtp_pass)
+        srv.sendmail(smtp_user, to_email, msg.as_string())
 
 # ── Database ──────────────────────────────────────────────────────────────────
 def get_db():
@@ -166,13 +269,12 @@ def index():
 def health():
     return jsonify({"ok": True, "service": "FVA Auth"})
 
-# ── Login ────────────────────────────────────────────────────────
+# ── Login (step 1) — validate credentials, send OTP email ────────
 @app.route("/api/login", methods=["POST"])
 def login():
     data     = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "")
-    email    = (data.get("email")    or "").strip().lower()
 
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
@@ -189,8 +291,41 @@ def login():
     if not bcrypt.checkpw(password.encode("utf-8"), stored):
         return jsonify({"error": "Invalid username or password"}), 401
 
-    if email and row["email"].lower() != email:
-        return jsonify({"error": "Email does not match the account for this username."}), 401
+    # Credentials valid — generate OTP and send to the user's registered email
+    mfa_token, otp_code = _store_otp(username)
+    name = row["name"] or username
+    try:
+        _send_otp_email(row["email"], name, otp_code)
+    except Exception as ex:
+        print(f"[FVA] OTP email error: {ex}")
+        return jsonify({"error": f"Could not send verification email. {ex}"}), 500
+
+    # Mask email for the UI hint: show first 2 chars + *** + @domain
+    em  = row["email"]
+    at  = em.index("@")
+    hint = em[:2] + ("*" * max(3, at - 2)) + em[at:]
+
+    return jsonify({"mfa_required": True, "mfa_token": mfa_token, "email_hint": hint})
+
+# ── Login (step 2) — verify email OTP, issue JWT ─────────────────
+@app.route("/api/verify-otp", methods=["POST"])
+def verify_otp():
+    data      = request.get_json(silent=True) or {}
+    mfa_token = (data.get("mfa_token") or "").strip()
+    code      = (data.get("code")      or "").strip()
+
+    if not mfa_token or not code:
+        return jsonify({"error": "Verification code required"}), 400
+
+    username = _consume_otp(mfa_token, code)
+    if not username:
+        return jsonify({"error": "Invalid or expired code. Please try again."}), 401
+
+    with get_db() as db:
+        row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+
+    if not row or row["blocked"]:
+        return jsonify({"error": "Account unavailable"}), 403
 
     return jsonify({
         "token": _make_token(row),
