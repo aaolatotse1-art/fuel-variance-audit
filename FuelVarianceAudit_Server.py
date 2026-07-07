@@ -51,9 +51,9 @@ BCRYPT_ROUNDS = 12      # ≈ 250 ms on modern hardware — adjust up for slower
 
 # ── Email 2FA / OTP ───────────────────────────────────────────────────────────
 # Set these environment variables before starting the server:
-#   FVA_SMTP_USER  — your Outlook/Office365 address  e.g. alerts@yourdomain.com
-#   FVA_SMTP_PASS  — your Outlook app password (not your login password)
-SMTP_HOST = "smtp.office365.com"
+#   FVA_SMTP_USER  — your email address  e.g. aolatotse@skybridge.co.bw
+#   FVA_SMTP_PASS  — your email password
+SMTP_HOST = "smtp.skybridge.co.bw"
 SMTP_PORT = 587
 OTP_TTL   = 600   # seconds (10 minutes)
 
