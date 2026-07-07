@@ -4902,36 +4902,39 @@ window._fc2={
 };
 
 /* ── Nav button ───────────────────────────────────────────────────────────── */
-function _getSettBtn(){
+function _getNavBtn(label){
   var root=document.getElementById('root');
   if(!root)return null;
   var btns=root.querySelectorAll('button');
   for(var i=0;i<btns.length;i++){
     var t=(btns[i].innerText||btns[i].textContent||'').trim().split('\n').pop();
-    if(t==='Settings')return btns[i];
+    if(t===label)return btns[i];
   }
   return null;
 }
+function _getSettBtn(){return _getNavBtn('Settings');}
 
 function _repos(){
   requestAnimationFrame(function(){
     var b=document.getElementById(BTN);
     if(!b)return;
-    var sett=_getSettBtn();
-    if(!sett)return;
-    var r=sett.getBoundingClientRect();
+    // Anchor: right after Documents button; fall back to left of Settings
+    var anchor=_getNavBtn('Documents')||_getNavBtn('Settings');
+    if(!anchor)return;
+    var r=anchor.getBoundingClientRect();
+    var isDoc=(anchor.innerText||anchor.textContent||'').trim().split('\n').pop()==='Documents';
     b.style.top=r.top+'px';
     b.style.height=r.height+'px';
-    b.style.left=(r.left-b.offsetWidth-4)+'px';
+    b.style.left=(isDoc?r.right+4:r.left-b.offsetWidth-4)+'px';
   });
 }
 
 function inject(){
   if(document.getElementById(BTN))return;
-  var sett=_getSettBtn();
+  var sett=_getNavBtn('Documents')||_getSettBtn();
   if(!sett)return;
   var nb=document.createElement('button');
-  nb.id=BTN; nb.type='button'; nb.textContent='Fuel Consumption';
+  nb.id=BTN; nb.type='button'; nb.textContent='Fuel';
   var cs=window.getComputedStyle(sett);
   nb.style.cssText=[
     'position:fixed','z-index:202','background:transparent','border:none',
@@ -4972,7 +4975,7 @@ document.addEventListener('click',function(ev){
   var btn=ev.target.closest('button');
   if(!btn||btn.id===BTN)return;
   var t=(btn.innerText||btn.textContent||'').trim().split('\n').pop();
-  if(['Dashboard','Analytics','Drivers','Documents','Settings'].indexOf(t)!==-1)deactivate();
+  if(btn.id!==BTN&&['Dashboard','Analytics','Drivers','Documents','Settings'].indexOf(t)!==-1)deactivate();
 },true);
 
 var _obs=new MutationObserver(function(){if(!document.getElementById(BTN))inject();});
