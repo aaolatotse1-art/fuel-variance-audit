@@ -4609,6 +4609,17 @@ function parseTrackerWorkbook(buffer, filename) {
 .fc2-empty{color:var(--text-muted);font-size:12px;padding:12px 0;text-align:center}
 .fc2-foot{font-size:11px;color:var(--text-muted);text-align:center;padding:8px 0 0;opacity:.7}
 @media(max-width:900px){.fc2-cards{grid-template-columns:1fr 1fr}.fc2-g2{grid-template-columns:1fr}}
+/* Single-selection: mute all other nav buttons while FC tab is active */
+body.fc2-on #fva-fc2-btn~button,
+body.fc2-on button:has(~#fva-fc2-btn){
+  color:var(--text-muted)!important;
+  border-bottom-color:transparent!important;
+  background:transparent!important;
+}
+body.fc2-on #fva-fc2-btn{
+  color:var(--accent)!important;
+  border-bottom:2px solid var(--accent)!important;
+}
 </style>
 <div id="fva-fc2-panel"><div id="fva-fc2-inner"></div></div>
 <script id="fva-fc2-js">
@@ -4918,7 +4929,7 @@ function inject(){
   var sett=_getSettBtn();
   if(!sett||!sett.parentElement)return;
   var nb=document.createElement('button');
-  nb.id=BTN; nb.type='button'; nb.textContent='Fuel';
+  nb.id=BTN; nb.type='button'; nb.textContent='Fuel Consumption';
   /* Copy React's class so font/spacing/padding match the other nav buttons exactly */
   nb.className=sett.className||'';
   nb.onclick=activate;
@@ -4933,8 +4944,7 @@ function activate(){
   var r=b.getBoundingClientRect();
   p.style.top=Math.round(r.bottom)+'px';
   p.style.display='flex';
-  b.style.color='var(--accent)';
-  b.style.borderBottom='2px solid var(--accent)';
+  document.body.classList.add('fc2-on');
   if(!_done){_done=true;_render();}
 }
 
@@ -4943,7 +4953,7 @@ function deactivate(){
   var p=document.getElementById(PANEL);
   var b=document.getElementById(BTN);
   if(p)p.style.display='none';
-  if(b){b.style.color='';b.style.borderBottom='';}
+  document.body.classList.remove('fc2-on');
 }
 
 document.addEventListener('click',function(ev){
