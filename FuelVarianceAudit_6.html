@@ -4609,16 +4609,24 @@ function parseTrackerWorkbook(buffer, filename) {
 .fc2-empty{color:var(--text-muted);font-size:12px;padding:12px 0;text-align:center}
 .fc2-foot{font-size:11px;color:var(--text-muted);text-align:center;padding:8px 0 0;opacity:.7}
 @media(max-width:900px){.fc2-cards{grid-template-columns:1fr 1fr}.fc2-g2{grid-template-columns:1fr}}
+/* Base: ensure the injected button is always transparent (React class lacks this for text-only buttons) */
+#fva-fc2-btn{
+  background:transparent!important;
+  border-top:none!important;border-left:none!important;border-right:none!important;
+  border-bottom:2px solid transparent;
+}
 /* Single-selection: mute all other nav buttons while FC tab is active */
 body.fc2-on #fva-fc2-btn~button,
 body.fc2-on button:has(~#fva-fc2-btn){
   color:var(--text-muted)!important;
-  border-bottom-color:transparent!important;
+  border-bottom:2px solid transparent!important;
   background:transparent!important;
 }
+/* Active state for FC button */
 body.fc2-on #fva-fc2-btn{
   color:var(--accent)!important;
   border-bottom:2px solid var(--accent)!important;
+  background:transparent!important;
 }
 </style>
 <div id="fva-fc2-panel"><div id="fva-fc2-inner"></div></div>
@@ -4932,6 +4940,8 @@ function inject(){
   nb.id=BTN; nb.type='button'; nb.textContent='Fuel Consumption';
   /* Copy React's class so font/spacing/padding match the other nav buttons exactly */
   nb.className=sett.className||'';
+  /* Force transparent background — React's class doesn't set this for text-only buttons */
+  nb.style.background='transparent';
   nb.onclick=activate;
   sett.parentElement.insertBefore(nb,sett);
 }
