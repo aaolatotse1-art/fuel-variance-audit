@@ -4901,73 +4901,49 @@ window._fc2={
   fileChg:    function(inp){if(inp.files[0])_readFile(inp.files[0]);},
 };
 
-/* ── Nav button ───────────────────────────────────────────────────────────── */
-function _getNavBtn(label){
+/* ── Nav button — inserted as a real DOM sibling of Settings ──────────────── */
+function _getSettBtn(){
   var root=document.getElementById('root');
   if(!root)return null;
   var btns=root.querySelectorAll('button');
   for(var i=0;i<btns.length;i++){
     var t=(btns[i].innerText||btns[i].textContent||'').trim().split('\n').pop();
-    if(t===label)return btns[i];
+    if(t==='Settings')return btns[i];
   }
   return null;
-}
-function _getSettBtn(){return _getNavBtn('Settings');}
-
-function _repos(){
-  requestAnimationFrame(function(){
-    var b=document.getElementById(BTN);
-    if(!b)return;
-    // Anchor: right after Documents button; fall back to left of Settings
-    var anchor=_getNavBtn('Documents')||_getNavBtn('Settings');
-    if(!anchor)return;
-    var r=anchor.getBoundingClientRect();
-    var isDoc=(anchor.innerText||anchor.textContent||'').trim().split('\n').pop()==='Documents';
-    b.style.top=r.top+'px';
-    b.style.height=r.height+'px';
-    b.style.left=(isDoc?r.right+4:r.left-b.offsetWidth-4)+'px';
-  });
 }
 
 function inject(){
   if(document.getElementById(BTN))return;
-  var sett=_getNavBtn('Documents')||_getSettBtn();
-  if(!sett)return;
+  var sett=_getSettBtn();
+  if(!sett||!sett.parentElement)return;
   var nb=document.createElement('button');
   nb.id=BTN; nb.type='button'; nb.textContent='Fuel';
-  var cs=window.getComputedStyle(sett);
-  nb.style.cssText=[
-    'position:fixed','z-index:202','background:transparent','border:none',
-    'border-bottom:2px solid transparent',
-    'font-family:'+cs.fontFamily,'font-size:'+cs.fontSize,
-    'font-weight:'+cs.fontWeight,'color:'+cs.color,
-    'letter-spacing:'+cs.letterSpacing,'padding:'+cs.padding,
-    'cursor:pointer','white-space:nowrap','display:inline-flex',
-    'align-items:center','top:-999px','left:-999px'
-  ].join(';');
+  /* Copy React's class so font/spacing/padding match the other nav buttons exactly */
+  nb.className=sett.className||'';
   nb.onclick=activate;
-  document.body.appendChild(nb);
-  _repos();
-  window.addEventListener('resize',_repos,{passive:true});
+  sett.parentElement.insertBefore(nb,sett);
 }
 
 function activate(){
   _on=true;
-  var p=document.getElementById(PANEL), b=document.getElementById(BTN);
-  if(!p||!b)return;
+  var b=document.getElementById(BTN);
+  var p=document.getElementById(PANEL);
+  if(!b||!p)return;
   var r=b.getBoundingClientRect();
   p.style.top=Math.round(r.bottom)+'px';
   p.style.display='flex';
-  b.style.background='var(--accent)'; b.style.color='#0f1923';
+  b.style.color='var(--accent)';
   b.style.borderBottom='2px solid var(--accent)';
   if(!_done){_done=true;_render();}
 }
 
 function deactivate(){
   _on=false;
-  var p=document.getElementById(PANEL), b=document.getElementById(BTN);
+  var p=document.getElementById(PANEL);
+  var b=document.getElementById(BTN);
   if(p)p.style.display='none';
-  if(b){b.style.background='transparent';b.style.color='';b.style.borderBottom='2px solid transparent';}
+  if(b){b.style.color='';b.style.borderBottom='';}
 }
 
 document.addEventListener('click',function(ev){
